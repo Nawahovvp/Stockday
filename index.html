@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>รายงาน มูลค่าศูนย์ Sparepart และ Stock Day ของแต่ละศูนย์</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.7.7/axios.min.js" onerror="console.error('Failed to load Axios')"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js" onerror="console.error('Failed to load PropTypes')"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" onerror="console.error('Failed to load React')"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" onerror="console.error('Failed to load ReactDOM')"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.25.6/babel.min.js" onerror="console.error('Failed to load Babel')"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.12.7/Recharts.min.js" onerror="console.error('Failed to load Recharts')"></script>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 0;
+    }
+
+    @media print {
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 297mm;
+        height: 210mm;
+        overflow: hidden;
+      }
+
+      .print-container {
+         .print-container {
+        width: 210mm;
+        height: 297mm;
+        margin: 0 auto;
+        padding: 20mm;
+      }
+        .chart-container {
+        height: 150mm !important; /* ปรับให้กราฟใช้พื้นที่ประมาณครึ่งหนึ่งของ A4 */
+      }
+
+      .print-container * {
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+
+      .w-full.h-\[400px\], .w-full.h-\[300px\] {
+        height: 300px !important;
+        width: 100% !important;
+        overflow: visible !important;
+      }
+
+      .recharts-surface {
+        transform: scale(0.9);
+        transform-origin: top left;
+      }
+
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 font-sans">
+  <div id="root" class="container mx-auto p-6"></div>
+  <div id="print-root" style="display: none;"></div>
+
+  <script type="text/babel">
+    console.log('Script started loading');
+
+    if (!window.React || !window.ReactDOM || !window.axios || !window.Recharts || !window.Babel) {
+      document.getElementById('root').innerHTML = `
+        <div class="flex justify-center items-center h-screen">
+          <p class="text-xl text-red-600">เกิดข้อผิดพลาด: ไม่สามารถโหลดไลบรารีที่จำเป็นได้</p>
+        </div>
+      `;
+      throw new Error('Missing required libraries');
+    }
+
+    class ErrorBoundary extends React.Component {
+      state = { error: null };
+      static getDerivedStateFromError(error) {
+        console.error('ErrorBoundary caught:', error);
+        return { error };
+      }
+      render() {
+        if (this.state.error) {
+          return (
+            <div className="flex justify-center items-center h-screen">
+              <p className="text-xl text-red-600">
+                เกิดข้อผิดพลาด: {this.state.error.message}
+              </p>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    const formatNumber = (num) => {
+      if (isNaN(num) || num === null || num === undefined) return '0';
+      if (num >= 1_000_000) return (num / 1_000_000).toFixed(2) + 'M';
+      if (num >= 1_000) return (num / 1_000).toFixed(2) + 'K';
+      return num.toFixed(0);
+    };
+
+    const PrintReport = ({ warehouse, historyData }) => {
+    const limitedHistoryData = historyData.slice(-1);
+
+    if (!limitedHistoryData || limitedHistoryData.length === 0) {
+      return (
+        <div className="print-container bg-white">
+          <p className="text-xl text-red-600 text-center">ไม่มีข้อมูลสำหรับคลังนี้</p>
+        </div>
+      );
+    }
+
+    const latestData = limitedHistoryData[limitedHistoryData.length - 1] || {};
+    const stockBegin = parseFloat(latestData['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0;
+    const stockEnd = parseFloat(latestData['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0;
+    const engBegin = parseFloat(latestData['ต้นงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
+    const engEnd = parseFloat(latestData['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
+    const totalStock = stockEnd;
+    const totalEng = engEnd;
+    const totalValue = totalStock + totalEng;
+    const cost = parseFloat(latestData['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0;
+    const stockDay = Math.round(parseFloat(latestData['Stock Day']?.toString().replace(/,/g, '')) || 0);
+
+    return (
+      <div className="print-container bg-white">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+          <div className="bg-blue-100 p-4 rounded-lg shadow">
+            <h3 className="text-base font-semibold text-blue-900">มูลค่ารวมทั้งหมด</h3>
+            <p className="text-xl font-bold text-blue-600">{formatNumber(totalValue)} บาท</p>
+          </div>
+          <div className="bg-green-200 p-4 rounded-lg shadow">
+            <h3 className="text-base font-semibold text-green-900">มูลค่าคลังรวม</h3>
+            <p className="text-xl font-bold text-green-700">{formatNumber(totalStock)} บาท</p>
+          </div>
+          <div className="bg-purple-100 p-4 rounded-lg shadow">
+            <h3 className="text-base font-semibold text-purple-800">มูลค่าวิศวกรรม</h3>
+            <p className="text-xl font-bold text-purple-600">{formatNumber(totalEng)} บาท</p>
+          </div>
+          <div className="bg-orange-100 p-4 rounded-lg shadow">
+            <h3 className="text-base font-semibold text-orange-800">ต้นทุนขาย</h3>
+            <p className="text-xl font-bold text-orange-600">{formatNumber(cost)} บาท</p>
+          </div>
+          <div className="bg-green-100 p-4 rounded-lg shadow">
+            <h3 className="text-base font-semibold text-green-800">Stock Day</h3>
+            <p className="text-xl font-bold text-green-600">{stockDay} วัน</p>
+          </div>
+        </div>
+        <div className="chart-container w-full h-[600px]">
+          <Recharts.ResponsiveContainer width="100%" height="100%">
+            <Recharts.ComposedChart data={limitedHistoryData} margin={{ top: 20, right: 30, left: 20, bottom: 100 }}>
+              <Recharts.CartesianGrid strokeDasharray="3 3" />
+              <Recharts.XAxis
+                dataKey="Mountyear"
+                angle={-45}
+                textAnchor="end"
+                interval={0}
+                height={80}
+                tick={{ fontSize: 12 }}
+              />
+              <Recharts.YAxis
+                yAxisId="left"
+                label={{ value: 'มูลค่า (บาท)', angle: -90, position: 'insideLeft', offset: -10 }}
+                tickFormatter={formatNumber}
+                tick={{ fontSize: 12 }}
+              />
+              <Recharts.YAxis
+                yAxisId="right"
+                orientation="right"
+                label={{ value: 'Stock Day (วัน)', angle: 90, position: 'insideRight', offset: -10 }}
+                tick={{ fontSize: 12 }}
+              />
+              <Recharts.Tooltip
+                formatter={(value, name) => {
+                  if (name === 'Stock Day' || name === 'เป้าหมาย 120 วัน') return [Math.round(value), 'วัน'];
+                  return [formatNumber(value), 'บาท'];
+                }}
+              />
+              <Recharts.Legend verticalAlign="top" height={36} />
+              <Recharts.Bar
+                yAxisId="left"
+                dataKey="มูลค่าคลังรวม"
+                name="มูลค่าคลังรวม"
+                stackId="a"
+                fill="#15803D"
+                barSize={20}
+              />
+              <Recharts.Bar
+                yAxisId="left"
+                dataKey="มูลค่าวิศวกรรม"
+                name="มูลค่าวิศวกรรม"
+                stackId="a"
+                fill="#6B21A8"
+                barSize={20}
+              />
+              <Recharts.Bar
+                yAxisId="left"
+                dataKey="ต้นทุนขาย"
+                name="ต้นทุนขาย"
+                fill="#F97316"
+                barSize={20}
+              />
+              <Recharts.Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="Stock Day"
+                name="Stock Day"
+                stroke="#10B981"
+                strokeWidth={2}
+                dot={{ r: 4 }}
+              />
+              <Recharts.ReferenceLine
+                yAxisId="right"
+                y={120}
+                label={{ value: 'เป้าหมาย 120 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
+                stroke="#DC2626"
+                strokeDasharray="5 5"
+                strokeWidth={2}
+                ifOverflow="extendDomain"
+              />
+            </Recharts.ComposedChart>
+          </Recharts.ResponsiveContainer>
+        </div>
+      </div>
+    );
+  };
+
+  const PrintSummaryReport = ({ historyData }) => {
+    const limitedHistoryData = historyData.slice(-1);
+    const latestData = limitedHistoryData[limitedHistoryData.length - 1] || {};
+    const totalValue = parseFloat(latestData['มูลค่าทั้งหมด']?.toString().replace(/,/g, '')) || 0;
+    const totalStock = parseFloat(latestData['มูลค่าคลังรวม']?.toString().replace(/,/g, '')) || 0;
+    const totalEng = parseFloat(latestData['มูลค่ารวมวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
+    const totalCost = parseFloat(latestData['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0;
+    const stockDay = Math.round(parseFloat(latestData['Stock Day']?.toString().replace(/,/g, '')) || 0);
+
+    return (
+      <div className="print-container bg-white">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+          <div className="bg-blue-100 p-4 rounded-lg shadow">
+            <h3 className="text-base font-semibold text-blue-900">มูลค่ารวมทั้งหมด</h3>
+            <p className="text-xl font-bold text-blue-600">{formatNumber(totalValue)} บาท</p>
+          </div>
+          <div className="bg-green-200 p-4 rounded-lg shadow">
+            <h3 className="text-base font-semibold text-green-900">มูล่าคลังรวม</h3>
+            <p className="text-xl font-bold text-green-700">{formatNumber(totalStock)} บาท</p>
+          </div>
+          <div className="bg-purple-100 p-4 rounded-lg shadow">
+            <h3 className="text-base font-semibold text-purple-800">มูลค่ารวมวิศวกรรม</h3>
+            <p className="text-xl font-bold text-purple-600">{formatNumber(totalEng)} บาท</p>
+          </div>
+          <div className="bg-orange-100 p-4 rounded-lg shadow">
+            <h3 className="text-base font-semibold text-orange-800">ต้นทุนขาย</h3>
+            <p className="text-xl font-bold text-orange-600">{formatNumber(totalCost)} บาท</p>
+          </div>
+          <div className="bg-green-100 p-4 rounded-lg shadow">
+            <h3 className="text-base font-semibold text-green-800">Stock Day</h3>
+            <p className="text-xl font-bold text-green-600">{stockDay} วัน</p>
+          </div>
+        </div>
+        <div className="chart-container w-full h-[600px]">
+          <Recharts.ResponsiveContainer width="100%" height="100%">
+            <Recharts.ComposedChart data={limitedHistoryData} margin={{ top: 20, right: 30, left: 20, bottom: 100 }}>
+              <Recharts.CartesianGrid strokeDasharray="3 3" />
+              <Recharts.XAxis
+                dataKey="Mountyear"
+                angle={-45}
+                textAnchor="end"
+                interval={0}
+                height={80}
+                tick={{ fontSize: 12 }}
+              />
+              <Recharts.YAxis
+                yAxisId="left"
+                label={{ value: 'มูลค่า (บาท)', angle: -90, position: 'insideLeft', offset: -10 }}
+                tickFormatter={formatNumber}
+                tick={{ fontSize: 12 }}
+              />
+              <Recharts.YAxis
+                yAxisId="right"
+                orientation="right"
+                label={{ value: 'Stock Day (วัน)', angle: 90, position: 'insideRight', offset: -10 }}
+                tick={{ fontSize: 12 }}
+              />
+              <Recharts.Tooltip
+                formatter={(value, name) => {
+                  if (name === 'Stock Day' || name === 'เป้าหมาย 120 วัน') return [Math.round(value), 'วัน'];
+                  return [formatNumber(value), 'บาท'];
+                }}
+              />
+              <Recharts.Legend verticalAlign="top" height={36} />
+              <Recharts.Bar
+                yAxisId="left"
+                dataKey="มูล่าคลังรวม"
+                name="มูล่าคลังรวม"
+                stackId="a"
+                fill="#15803D"
+                barSize={20}
+              />
+              <Recharts.Bar
+                yAxisId="left"
+                dataKey="มูลค่ารวมวิศวกรรม"
+                name="มูลค่ารวมวิศวกรรม"
+                stackId="a"
+                fill="#6B21A8"
+                barSize={20}
+              />
+              <Recharts.Bar
+                yAxisId="left"
+                dataKey="ต้นทุนขาย"
+                name="ต้นทุนขาย"
+                fill="#F97316"
+                barSize={20}
+              />
+              <Recharts.Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="Stock Day"
+                name="Stock Day"
+                stroke="#10B981"
+                strokeWidth={2}
+                dot={{ r: 4 }}
+              />
+              <Recharts.ReferenceLine
+                yAxisId="right"
+                y={120}
+                label={{ value: 'เป้าหมาย 120 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
+                stroke="#DC2626"
+                strokeDasharray="5 5"
+                strokeWidth={2}
+                ifOverflow="extendDomain"
+              />
+            </Recharts.ComposedChart>
+          </Recharts.ResponsiveContainer>
+        </div>
+      </div>
+    );
+  };
+
+    const HistoryPopup = ({ isOpen, onClose, warehouse, data }) => {
+      if (!isOpen) return null;
+
+      const historyData = data
+        .filter(item => item['ชื่อคลัง'] === warehouse)
+        .map(item => {
+          const stockBegin = parseFloat(item['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0;
+          const stockEnd = parseFloat(item['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0;
+          const engBegin = parseFloat(item['ต้นงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
+          const engEnd = parseFloat(item['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
+          return {
+            ...item,
+            'มูลค่าคลังรวม': (stockEnd),
+            'มูลค่าวิศวกรรม': (engEnd),
+            'Stock Day': Math.round(parseFloat(item['Stock Day']?.toString().replace(/,/g, '')) || 0)
+          };
+        })
+        .sort((a, b) => {
+          const [monthA, yearA] = a['Mountyear']?.split('/') || ['01', '2000'];
+          const [monthB, yearB] = b['Mountyear']?.split('/') || ['01', '2000'];
+          const dateA = new Date(`${yearA}-${monthA}-01`);
+          const dateB = new Date(`${yearB}-${monthB}-01`);
+          return dateA - dateB;
+        });
+
+      const handlePrint = () => {
+        if (!historyData || historyData.length === 0) {
+          alert('ไม่มีข้อมูลสำหรับพิมพ์');
+          return;
+        }
+
+        const printRoot = document.getElementById('print-root');
+        if (!printRoot) {
+          console.error('Print root element not found');
+          return;
+        }
+
+        printRoot.style.display = 'block';
+        printRoot.innerHTML = '';
+
+        try {
+          ReactDOM.render(
+            <PrintReport warehouse={warehouse} historyData={historyData} />,
+            printRoot,
+            () => {
+              console.log('PrintReport rendered successfully');
+              setTimeout(() => {
+                console.log('Calling window.print()');
+                window.print();
+                printRoot.style.display = 'none';
+                ReactDOM.unmountComponentAtNode(printRoot);
+              }, 1000);
+            }
+          );
+        } catch (error) {
+          console.error('Error rendering print report:', error);
+          printRoot.style.display = 'none';
+          alert('เกิดข้อผิดพลาดในการพิมพ์: ' + error.message);
+        }
+      };
+
+      const latestData = historyData[historyData.length - 1] || {};
+      const latestStock = latestData['มูลค่าคลังรวม'] || 0;
+      const latestEng = latestData['มูลค่าวิศวกรรม'] || 0;
+      const latestTotal = latestStock + latestEng;
+      const latestCost = parseFloat(latestData['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0;
+      const latestStockDay = latestData['Stock Day'] || 0;
+
+      return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-[80%] max-w-4xl p-6 relative pt-20">
+            <button
+              onClick={onClose}
+              className="no-print absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
+            >
+              Close
+            </button>
+            <button
+              onClick={handlePrint}
+              className="no-print absolute top-4 right-24 bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600"
+            >
+              Print
+            </button>
+            <h2 className="text-2xl font-semibold text-blue-800 mb-4">
+              รายงานมูลค่า Sparepart และ Stock Day ศูนย์: {warehouse} ประจำเดือน {latestData['Mountyear'] || 'ไม่ระบุ'}
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+              <div className="bg-blue-100 p-4 rounded-lg shadow">
+  <h3 className="text-base font-semibold text-blue-900">มูลค่ารวมทั้งหมด</h3>
+  <p className="text-xl font-bold text-blue-600">{formatNumber(latestTotal)} บาท</p>
+</div>
+
+
+              <div className="bg-green-200 p-4 rounded-lg shadow">
+  <h3 className="text-base font-semibold text-green-900">มูลค่าคลังรวม</h3>
+  <p className="text-xl font-bold text-green-700">{formatNumber(latestStock)} บาท</p>
+</div>
+
+              <div className="bg-purple-100 p-4 rounded-lg shadow">
+                <h3 className="text-base font-semibold text-purple-800">มูลค่าวิศวกรรม</h3>
+                <p className="text-xl font-bold text-purple-600">{formatNumber(latestEng)} บาท</p>
+              </div>
+              <div className="bg-orange-100 p-4 rounded-lg shadow">
+                <h3 className="text-base font-semibold text-orange-800">ต้นทุนขาย</h3>
+                <p className="text-xl font-bold text-orange-600">{formatNumber(latestCost)} บาท</p>
+              </div>
+              <div className="bg-green-100 p-4 rounded-lg shadow">
+                <h3 className="text-base font-semibold text-green-800">Stock Day</h3>
+                <p className="text-xl font-bold text-green-600">{latestStockDay} วัน</p>
+              </div>
+            </div>
+            <div className="w-full h-[400px]">
+              <Recharts.ResponsiveContainer width="100%" height="100%">
+                <Recharts.ComposedChart data={historyData} margin={{ top: 20, right: 30, left: 20, bottom: 100 }}>
+                  <Recharts.CartesianGrid strokeDasharray="3 3" />
+                  <Recharts.XAxis
+                    dataKey="Mountyear"
+                    angle={-45}
+                    textAnchor="end"
+                    interval={0}
+                    height={80}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Recharts.YAxis
+                    yAxisId="left"
+                    label={{ value: 'มูลค่า (บาท)', angle: -90, position: 'insideLeft', offset: -10 }}
+                    tickFormatter={formatNumber}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Recharts.YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    label={{ value: 'Stock Day (วัน)', angle: 90, position: 'insideRight', offset: -10 }}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Recharts.Tooltip
+                    formatter={(value, name) => {
+                      if (name === 'Stock Day' || name === 'เป้าหมาย 120 วัน') return [Math.round(value), 'วัน'];
+                      return [formatNumber(value), 'บาท'];
+                    }}
+                  />
+                  <Recharts.Legend verticalAlign="top" height={36} />
+                  <Recharts.Bar
+                    yAxisId="left"
+                    dataKey="มูลค่าคลังรวม"
+                    name="มูลค่าคลังรวม"
+                    stackId="a"
+                    fill="#15803D"
+                    barSize={20}
+                  />
+                  <Recharts.Bar
+                    yAxisId="left"
+                    dataKey="มูลค่าวิศวกรรม"
+                    name="มูลค่าวิศวกรรม"
+                    stackId="a"
+                    fill="#6B21A8"
+                    barSize={20}
+                  />
+                  <Recharts.Bar
+                    yAxisId="left"
+                    dataKey="ต้นทุนขาย"
+                    name="ต้นทุนขาย"
+                    fill="#F97316"
+                    barSize={20}
+                  />
+                  <Recharts.Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="Stock Day"
+                    name="Stock Day"
+                    stroke="#10B981"
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                  />
+                  <Recharts.ReferenceLine
+                    yAxisId="right"
+                    y={120}
+                    label={{ value: 'เป้าหมาย 120 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
+                    stroke="#DC2626"
+                    strokeDasharray="5 5"
+                    strokeWidth={2}
+                    ifOverflow="extendDomain"
+                  />
+                </Recharts.ComposedChart>
+              </Recharts.ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const SummaryHistoryPopup = ({ isOpen, onClose, data }) => {
+      if (!isOpen) return null;
+
+      const summaryData = [...new Set(data.map(item => item['Mountyear']))]
+        .filter(my => my)
+        .map(mountyear => {
+          const mountyearData = data.filter(item => item['Mountyear'] === mountyear);
+          const totalValue = mountyearData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
+          const totalStock = mountyearData.reduce((sum, item) => {
+            const stockBegin = parseFloat(item['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0;
+            const stockEnd = parseFloat(item['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0;
+            return sum + (stockEnd);
+          }, 0);
+          const totalEng = mountyearData.reduce((sum, item) => {
+            const engBegin = parseFloat(item['ต้นงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
+            const engEnd = parseFloat(item['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
+            return sum + (engEnd);
+          }, 0);
+          const totalCost = mountyearData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
+          const stockDay = totalCost > 0 ? Math.round((totalValue / totalCost) * 30) : 0;
+          return {
+            Mountyear: mountyear,
+            'มูลค่าทั้งหมด': totalValue,
+            'มูลค่าคลังรวม': totalStock,
+            'มูลค่ารวมวิศวกรรม': totalEng,
+            'ต้นทุนขาย': totalCost,
+            'Stock Day': stockDay
+          };
+        })
+        .sort((a, b) => {
+          const [monthA, yearA] = a.Mountyear?.split('/') || ['01', '2000'];
+          const [monthB, yearB] = b.Mountyear?.split('/') || ['01', '2000'];
+          const dateA = new Date(`${yearA}-${monthA}-01`);
+          const dateB = new Date(`${yearB}-${monthB}-01`);
+          return dateA - dateB;
+        });
+
+      const handlePrint = () => {
+        if (!summaryData || summaryData.length === 0) {
+          alert('ไม่มีข้อมูลสำหรับพิมพ์');
+          return;
+        }
+
+        const printRoot = document.getElementById('print-root');
+        if (!printRoot) {
+          console.error('Print root element not found');
+          return;
+        }
+
+        printRoot.style.display = 'block';
+        printRoot.innerHTML = '';
+
+        try {
+          ReactDOM.render(
+            <PrintSummaryReport historyData={summaryData} />,
+            printRoot,
+            () => {
+              console.log('PrintSummaryReport rendered successfully');
+              setTimeout(() => {
+                console.log('Calling window.print()');
+                window.print();
+                printRoot.style.display = 'none';
+                ReactDOM.unmountComponentAtNode(printRoot);
+              }, 1000);
+            }
+          );
+        } catch (error) {
+          console.error('Error rendering print report:', error);
+          printRoot.style.display = 'none';
+          alert('เกิดข้อผิดพลาดในการพิมพ์: ' + error.message);
+        }
+      };
+
+      const latestData = summaryData[summaryData.length - 1] || {};
+      const latestTotalValue = latestData['มูลค่าทั้งหมด'] || 0;
+      const latestStock = latestData['มูลค่าคลังรวม'] || 0;
+      const latestEng = latestData['มูลค่ารวมวิศวกรรม'] || 0;
+      const latestCost = latestData['ต้นทุนขาย'] || 0;
+      const latestStockDay = latestData['Stock Day'] || 0;
+
+      return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-[80%] max-w-4xl p-6 relative pt-20">
+            <button
+              onClick={onClose}
+              className="no-print absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
+            >
+              Close
+            </button>
+            <button
+              onClick={handlePrint}
+              className="no-print absolute top-4 right-24 bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600"
+            >
+              Print
+            </button>
+            <h2 className="text-2xl font-semibold text-blue-800 mb-4">
+              รายงานสรุปมูลค่า Sparepart และ Stock Day ประจำเดือน {latestData['Mountyear'] || 'ไม่ระบุ'}
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+              <div className="bg-blue-100 p-4 rounded-lg shadow">
+  <h3 className="text-base font-semibold text-blue-900">มูลค่ารวมทั้งหมด</h3>
+  <p className="text-xl font-bold text-blue-600">{formatNumber(latestTotalValue)} บาท</p>
+</div>
+
+
+              <div className="bg-green-200 p-4 rounded-lg shadow">
+  <h3 className="text-base font-semibold text-green-900">มูลค่าคลังรวม</h3>
+  <p className="text-xl font-bold text-green-700">{formatNumber(latestStock)} บาท</p>
+</div>
+
+              <div className="bg-purple-100 p-4 rounded-lg shadow">
+                <h3 className="text-base font-semibold text-purple-800">มูลค่ารวมวิศวกรรม</h3>
+                <p className="text-xl font-bold text-purple-600">{formatNumber(latestEng)} บาท</p>
+              </div>
+              <div className="bg-orange-100 p-4 rounded-lg shadow">
+                <h3 className="text-base font-semibold text-orange-800">ต้นทุนขาย</h3>
+                <p className="text-xl font-bold text-orange-600">{formatNumber(latestCost)} บาท</p>
+              </div>
+              <div className="bg-green-100 p-4 rounded-lg shadow">
+                <h3 className="text-base font-semibold text-green-800">Stock Day</h3>
+                <p className="text-xl font-bold text-green-600">{latestStockDay} วัน</p>
+              </div>
+            </div>
+            <div className="w-full h-[400px]">
+              <Recharts.ResponsiveContainer width="100%" height="100%">
+                <Recharts.ComposedChart data={summaryData} margin={{ top: 20, right: 30, left: 20, bottom: 100 }}>
+                  <Recharts.CartesianGrid strokeDasharray="3 3" />
+                  <Recharts.XAxis
+                    dataKey="Mountyear"
+                    angle={-45}
+                    textAnchor="end"
+                    interval={0}
+                    height={80}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Recharts.YAxis
+                    yAxisId="left"
+                    label={{ value: 'มูลค่า (บาท)', angle: -90, position: 'insideLeft', offset: -10 }}
+                    tickFormatter={formatNumber}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Recharts.YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    label={{ value: 'Stock Day (วัน)', angle: 90, position: 'insideRight', offset: -10 }}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Recharts.Tooltip
+                    formatter={(value, name) => {
+                      if (name === 'Stock Day' || name === 'เป้าหมาย 120 วัน') return [Math.round(value), 'วัน'];
+                      return [formatNumber(value), 'บาท'];
+                    }}
+                  />
+                  <Recharts.Legend verticalAlign="top" height={36} />
+                  <Recharts.Bar
+                    yAxisId="left"
+                    dataKey="มูลค่าคลังรวม"
+                    name="มูลค่าคลังรวม"
+                    stackId="a"
+                    fill="#15803D"
+                    barSize={20}
+                  />
+                  <Recharts.Bar
+                    yAxisId="left"
+                    dataKey="มูลค่ารวมวิศวกรรม"
+                    name="มูลค่ารวมวิศวกรรม"
+                    stackId="a"
+                    fill="#6B21A8"
+                    barSize={20}
+                  />
+                  <Recharts.Bar
+                    yAxisId="left"
+                    dataKey="ต้นทุนขาย"
+                    name="ต้นทุนขาย"
+                    fill="#F97316"
+                    barSize={20}
+                  />
+                  <Recharts.Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="Stock Day"
+                    name="Stock Day"
+                    stroke="#10B981"
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                  />
+                  <Recharts.ReferenceLine
+                    yAxisId="right"
+                    y={120}
+                    label={{ value: 'เป้าหมาย 120 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
+                    stroke="#DC2626"
+                    strokeDasharray="5 5"
+                    strokeWidth={2}
+                    ifOverflow="extendDomain"
+                  />
+                </Recharts.ComposedChart>
+              </Recharts.ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const App = () => {
+      const [data, setData] = React.useState([]);
+      const [filteredData, setFilteredData] = React.useState([]);
+      const [monthYears, setMonthYears] = React.useState([]);
+      const [selectedMonthYear, setSelectedMonthYear] = React.useState('');
+      const [loading, setLoading] = React.useState(true);
+      const [error, setError] = React.useState(null);
+      const [showHistoryPopup, setShowHistoryPopup] = React.useState(false);
+      const [selectedWarehouse, setSelectedWarehouse] = React.useState('');
+      const [showSummaryHistoryPopup, setShowSummaryHistoryPopup] = React.useState(false);
+
+      React.useEffect(() => {
+        const url = 'https://opensheet.elk.sh/1r418cqPa92z1_tO62z369pvQrzD3MVlaAfISMXSGFMc/Web';
+
+        axios.get(url)
+          .then(response => {
+            const rows = response.data;
+            if (!rows || rows.length === 0) {
+              setError('ไม่มีข้อมูลใน Google Sheet');
+              setLoading(false);
+              return;
+            }
+
+            const cleanedData = rows.map(row => {
+              const beginValue = parseFloat(row['ต้นงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0;
+              const endValue = parseFloat(row['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0;
+              const costValue = parseFloat(row['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0;
+              const stockBegin = parseFloat(row['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0;
+              const stockEnd = parseFloat(row['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0;
+              const engBegin = parseFloat(row['ต้นงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
+              const engEnd = parseFloat(row['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
+              return {
+                ...row,
+                'ต้นงวดคลัง': stockBegin,
+                'ต้นงวดวิศวกรรม': engBegin,
+                'ต้นงวดมูลค่ารวม': beginValue,
+                'ปลายงวดคลัง': stockEnd,
+                'ปลายงวดวิศวกรรม': engEnd,
+                'ปลายงวดมูลค่ารวม': endValue,
+                'ต้นทุนขาย': costValue,
+                'Stock Day': parseFloat(row['Stock Day']?.toString().replace(/,/g, '')) || 0,
+                'Mountyear': row['Mountyear']?.trim() || '',
+                'ชื่อคลัง': row['ชื่อคลัง']?.trim() || '',
+                'StatusSAcom': row['StatusSAcom']?.trim() || '',
+                'มูลค่าคลังรวม': (stockBegin + stockEnd) / 2,
+                'มูลค่าคลัง': (stockBegin + stockEnd) / 2,
+                'มูลค่าวิศวกรรม': (engBegin + engEnd) / 2
+              };
+            });
+
+            const monthYearSet = new Set(cleanedData.map(row => row['Mountyear']));
+            const monthYearArray = [...monthYearSet].filter(my => my).sort((a, b) => {
+              const [monthA, yearA] = a?.split('/') || ['01', '2000'];
+              const [monthB, yearB] = b?.split('/') || ['01', '2000'];
+              const dateA = new Date(`${yearA}-${monthA}-01`);
+              const dateB = new Date(`${yearB}-${monthB}-01`);
+              return dateB - dateA;
+            });
+
+            const latestMonthYear = monthYearArray[0] || '';
+            setMonthYears(monthYearArray);
+            setData(cleanedData);
+            setSelectedMonthYear(latestMonthYear);
+            setFilteredData(latestMonthYear ? cleanedData.filter(row => row['Mountyear'] === latestMonthYear) : cleanedData);
+            setLoading(false);
+          })
+          .catch(err => {
+            setError(`ไม่สามารถดึงข้อมูลจาก Google Sheet ได้: ${err.message}`);
+            setLoading(false);
+          });
+      }, []);
+
+      React.useEffect(() => {
+        if (selectedMonthYear) {
+          setFilteredData(data.filter(row => row['Mountyear'] === selectedMonthYear));
+        } else {
+          setFilteredData(data);
+        }
+      }, [selectedMonthYear, data]);
+
+      const handleHistoryClick = (warehouse) => {
+        setSelectedWarehouse(warehouse);
+        setShowHistoryPopup(true);
+      };
+
+      const handleCloseHistoryPopup = () => {
+        setShowHistoryPopup(false);
+        setSelectedWarehouse('');
+      };
+
+      const handleCloseSummaryHistoryPopup = () => {
+        setShowSummaryHistoryPopup(false);
+      };
+
+      if (loading) {
+        return (
+          <div className="flex justify-center items-center h-screen">
+            <p className="text-xl text-gray-600">กำลังโหลดข้อมูล...</p>
+          </div>
+        );
+      }
+
+      if (error) {
+        return (
+          <div className="flex justify-center items-center h-screen">
+            <p className="text-xl text-red-600">{error}</p>
+          </div>
+        );
+      }
+
+      const companyData = filteredData
+        .filter((item) => item['StatusSAcom'] === 'Company')
+        .sort((a, b) => (b['Stock Day'] || 0) - (a['Stock Day'] || 0));
+      const saData = filteredData
+        .filter((item) => item['StatusSAcom'] === 'SA')
+        .sort((a, b) => (b['Stock Day'] || 0) - (a['Stock Day'] || 0));
+      const companyChartData = companyData.filter(item => !['นวนคร', 'คลังวัตถุดิบ'].includes(item['ชื่อคลัง']));
+
+      const totalValue = filteredData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
+      const totalStock = filteredData.reduce((sum, item) => {
+        const stockBegin = parseFloat(item['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0;
+        const stockEnd = parseFloat(item['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0;
+        return sum + stockEnd;
+      }, 0);
+      const totalEng = filteredData.reduce((sum, item) => {
+        const engBegin = parseFloat(item['ต้นงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
+        const engEnd = parseFloat(item['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
+        return sum + engEnd;
+      }, 0);
+      const totalCost = filteredData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
+      const totalStockDay = totalCost > 0 ? Math.round((totalValue / totalCost) * 30) : 0;
+
+      const companyTotalValue = companyData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
+      const companyTotalStock = companyData.reduce((sum, item) => {
+        const stockBegin = parseFloat(item['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0;
+        const stockEnd = parseFloat(item['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0;
+        return sum + stockEnd;
+      }, 0);
+      const companyTotalEng = companyData.reduce((sum, item) => {
+        const engBegin = parseFloat(item['ต้นงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
+        const engEnd = parseFloat(item['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
+        return sum + engEnd;
+      }, 0);
+      const companyTotalCost = companyData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
+      const companySumBeginValue = companyData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
+      const companySumEndValue = companyData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
+      const companyAvgStockday = companyTotalCost > 0 ? Math.round((((companySumBeginValue + companySumEndValue)/2) / companyTotalCost) * 30) : 0;
+
+      const saTotalValue = saData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
+      const saTotalStock = saData.reduce((sum, item) => {
+        const stockBegin = parseFloat(item['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0;
+        const stockEnd = parseFloat(item['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0;
+        return sum + stockEnd;
+      }, 0);
+      const saTotalEng = saData.reduce((sum, item) => {
+        const engBegin = parseFloat(item['ต้นงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
+        const engEnd = parseFloat(item['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
+        return sum + engEnd;
+      }, 0);
+      const saTotalCost = saData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
+      const saSumBeginValue = saData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
+      const saSumEndValue = saData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
+      const saAvgStockday = saTotalCost > 0 ? Math.round((((saSumEndValue + saSumBeginValue)/2) / saTotalCost) * 30) : 0;
+
+      const nakhonData = companyData.find(item => item['ชื่อคลัง'] === 'นวนคร') || { 'ปลายงวดคลัง': 0 };
+      const rawMaterialData = companyData.find(item => item['ชื่อคลัง'] === 'คลังวัตถุดิบ') || { 'ปลายงวดคลัง': 0 };
+
+      const companySumBeginStock = companyData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0), 0);
+      const companySumBeginEng = companyData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0), 0);
+      const companySumEndStock = companyData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0), 0);
+      const companySumEndEng = companyData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0), 0);
+      const companySumCost = companyData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
+      const companySumStockDay = companySumCost > 0 ? Math.round((((companySumEndValue + companySumBeginValue)/2) / companySumCost) * 30) : 0;
+
+      const saSumBeginStock = saData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0), 0);
+      const saSumBeginEng = saData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0), 0);
+      const saSumEndStock = saData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0), 0);
+      const saSumEndEng = saData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0), 0);
+      const saSumCost = saData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
+      const saSumStockDay = saSumCost > 0 ? Math.round((((saSumEndValue + saSumBeginValue)/2) / saSumCost) * 30) : 0;
+
+      return (
+        <ErrorBoundary>
+          <div className="bg-white rounded-lg shadow-lg p-6">
+          <h1 className="text-6xl font-bold text-center text-blue-900 mb-4 font-roboto">SPAREPART</h1>
+            <h1 className="text-3xl font-bold text-center text-blue-800 mb-6">
+              รายงานมูลค่า Sparepart และ Stock Day ของแต่ละศูนย์
+            </h1>
+
+            <div className="mb-8 flex flex-row flex-wrap items-center justify-start gap-6">
+              <label className="text-2xl font-bold text-blue-900">เลือกเดือน-ปี:</label>
+              <div className="relative w-full max-w-[220px]">
+                <select
+                  value={selectedMonthYear}
+                  onChange={(e) => setSelectedMonthYear(e.target.value)}
+                  className="w-full appearance-none bg-blue-50 border-2 border-blue-500 text-blue-900 text-2xl font-bold rounded-lg px-6 py-4 shadow-md focus:outline-none focus:ring-4 focus:ring-blue-600 focus:border-blue-600 hover:bg-blue-100 transition-all duration-300"
+                >
+                  <option value="">ทั้งหมด</option>
+                  {monthYears.length > 0 ? (
+                    monthYears.map((my, index) => (
+                      <option key={index} value={my}>{my}</option>
+                    ))
+                  ) : (
+                    <option value="" disabled>ไม่มีข้อมูลเดือน-ปี</option>
+                  )}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                  <svg className="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </div>
+              </div>
+              <span className="w-[220px] text-2xl font-bold text-blue-900 bg-blue-50 border-2 border-blue-500 px-4 py-4 rounded-lg shadow-md">เป้าหมาย 120 วัน</span>
+              <button
+                onClick={() => setShowSummaryHistoryPopup(true)}
+                className="w-[220px] text-2xl font-bold text-white bg-blue-500 border-2 border-blue-700 px-4 py-4 rounded-lg shadow-md hover:bg-blue-600 transition-all duration-300"
+              >
+                ผลดำเนินการ
+              </button>
+            </div>
+
+            <div className="mb-8">
+              <h2 className="text-2xl font-semibold text-blue-800 mb-4 tracking-wide leading-relaxed shadow-md">รายงานมูลค่า SPAREPART ทั้งหมด</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="bg-blue-100 p-4 rounded-lg shadow">
+                  <h2 className="text-lg font-semibold text-blue-900">มูลค่าทั้งหมด</h2>
+                   <p className="text-2xl font-bold text-blue-700">{formatNumber(totalValue)} บาท</p>
+                </div>
+                <div className="bg-green-200 p-4 rounded-lg shadow">
+                  <h2 className="text-lg font-semibold text-green-900">มูลค่าคลังรวม</h2>
+                   <p className="text-2xl font-bold text-green-700">{formatNumber(totalStock)} บาท</p>
+                </div>
+                <div className="bg-purple-100 p-4 rounded-lg shadow">
+                  <h2 className="text-lg font-semibold text-purple-800">มูลค่ารวมวิศวกรรม</h2>
+                  <p className="text-2xl font-bold text-purple-600">{formatNumber(totalEng)} บาท</p>
+                </div>
+                <div className="bg-orange-100 p-4 rounded-lg shadow">
+                  <h2 className="text-base font-semibold text-orange-800">ต้นทุนขาย</h2>
+                  <p className="text-2xl font-bold text-orange-600">{formatNumber(totalCost)} บาท</p>
+                </div>
+                <div className="bg-purple-100 p-4 rounded-lg shadow">
+                  <h2 className="text-lg font-semibold text-purple-800">Stock Day รวม</h2>
+                  <p className="text-2xl font-bold text-purple-600">{totalStockDay} วัน</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-12">
+            <h2 className="text-2xl font-semibold text-blue-800 mb-4 tracking-wide leading-relaxed shadow-md">รายงานมูลค่า SPAREPART ศูนย์ Company</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+                <div className="bg-blue-100 p-4 rounded-lg shadow">
+  <h2 className="text-lg font-semibold text-blue-900">มูลค่าทั้งหมด (Company)</h2>
+  <p className="text-2xl font-bold text-blue-700">{formatNumber(companyTotalValue)} บาท</p>
+</div>
+                <div className="bg-green-200 p-4 rounded-lg shadow">
+  <h2 className="text-lg font-semibold text-green-900">มูลค่าคลังรวม (Company)</h2>
+  <p className="text-2xl font-bold text-green-700">{formatNumber(companyTotalStock)} บาท</p>
+</div>
+
+                <div className="bg-purple-100 p-4 rounded-lg shadow">
+                  <h2 className="text-lg font-semibold text-purple-800">มูลค่ารวมวิศวกรรม (Company)</h2>
+                  <p className="text-2xl font-bold text-purple-600">{formatNumber(companyTotalEng)} บาท</p>
+                </div>
+                <div className="bg-orange-100 p-4 rounded-lg shadow">
+                  <h2 className="text-lg font-semibold text-orange-800">ต้นทุนขาย (Company)</h2>
+                  <p className="text-2xl font-bold text-orange-600">{formatNumber(companyTotalCost)} บาท</p>
+                </div>
+                <div className="bg-purple-100 p-4 rounded-lg shadow">
+                  <h2 className="text-lg font-semibold text-purple-800">Stock Day รวม (Company)</h2>
+                  <p className="text-2xl font-bold text-purple-600">{companyAvgStockday} วัน</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-4 mb-6">
+                <div className="bg-yellow-100 p-4 rounded-lg shadow flex-1 min-w-[200px]">
+                  <h3 className="text-lg font-semibold text-yellow-800">นวนคร มูลค่าคลัง</h3>
+                  <p className="text-2xl font-bold text-yellow-600">{formatNumber(nakhonData['ปลายงวดคลัง'])} บาท</p>
+                </div>
+                <div className="bg-yellow-100 p-4 rounded-lg shadow flex-1 min-w-[200px]">
+                  <h3 className="text-lg font-semibold text-yellow-800">คลังวัตถุดิบ มูลค่าคลัง</h3>
+                  <p className="text-2xl font-bold text-yellow-600">{formatNumber(rawMaterialData['ปลายงวดคลัง'])} บาท</p>
+                </div>
+              </div>
+              <div className="w-full h-[500px]">
+                <Recharts.ResponsiveContainer width="100%" height="100%">
+                  <Recharts.ComposedChart data={companyChartData} margin={{ top: 20, right: 30, left: 20, bottom: 100 }}>
+                    <Recharts.CartesianGrid strokeDasharray="3 3" />
+                    <Recharts.XAxis
+                      dataKey="ชื่อคลัง"
+                      angle={-45}
+                      textAnchor="end"
+                      interval={0}
+                      height={100}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Recharts.YAxis
+                      yAxisId="left"
+                      label={{ value: 'มูลค่า (บาท)', angle: -90, position: 'insideLeft', offset: -10 }}
+                      tickFormatter={formatNumber}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Recharts.YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      label={{ value: 'Stock Day (วัน)', angle: 90, position: 'insideRight', offset: -10 }}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Recharts.Tooltip
+                      formatter={(value, name) => {
+                        if (name === 'Stock Day' || name === 'เป้าหมาย 120 วัน') return [Math.round(value), 'วัน'];
+                        return [formatNumber(value), 'บาท'];
+                      }}
+                    />
+                    <Recharts.Legend verticalAlign="top" height={36} />
+                    <Recharts.Bar
+                      yAxisId="left"
+                      dataKey="มูลค่าคลัง"
+                      name="มูลค่าคลัง"
+                      stackId="a"
+                      fill="#15803D"
+                      barSize={20}
+                    />
+                    <Recharts.Bar
+                      yAxisId="left"
+                      dataKey="มูลค่าวิศวกรรม"
+                      name="มูลค่าวิศวกรรม"
+                      stackId="a"
+                      fill="#6B21A8"
+                      barSize={20}
+                    />
+                    <Recharts.Bar
+                      yAxisId="left"
+                      dataKey="ต้นทุนขาย"
+                      name="ต้นทุนขาย"
+                      fill="#F97316"
+                      barSize={20}
+                    />
+                    <Recharts.Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="Stock Day"
+                      name="Stock Day"
+                      stroke="#10B981"
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                    />
+                    <Recharts.ReferenceLine
+                      yAxisId="right"
+                      y={120}
+                      label={{ value: 'เป้าหมาย 120 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
+                      stroke="#DC2626"
+                      strokeDasharray="5 5"
+                      strokeWidth={2}
+                      ifOverflow="extendDomain"
+                    />
+                  </Recharts.ComposedChart>
+                </Recharts.ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="mb-12">
+              <h2 className="text-2xl font-semibold text-blue-800 mb-4 tracking-wide leading-relaxed shadow-md">รายงานมูลค่า SPAREPART ศูนย์ SA</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+                <div className="bg-blue-100 p-4 rounded-lg shadow">
+                <h2 className="text-lg font-semibold text-blue-900">มูลค่าทั้งหมด (SA)</h2>
+                  <p className="text-2xl font-bold text-blue-700">{formatNumber(saTotalValue)} บาท</p>
+                </div>
+                <div className="bg-green-200 p-4 rounded-lg shadow">
+                <h2 className="text-lg font-semibold text-green-900">มูลค่าคลังรวม (SA)</h2>
+                  <p className="text-2xl font-bold text-green-700">{formatNumber(saTotalStock)} บาท</p>
+                </div>
+                <div className="bg-purple-100 p-4 rounded-lg shadow">
+                  <h2 className="text-lg font-semibold text-purple-800">มูลค่ารวมวิศวกรรม (SA)</h2>
+                  <p className="text-2xl font-bold text-purple-600">{formatNumber(saTotalEng)} บาท</p>
+                </div>
+                <div className="bg-orange-100 p-4 rounded-lg shadow">
+                  <h2 className="text-lg font-semibold text-orange-800">ต้นทุนขาย (SA)</h2>
+                  <p className="text-2xl font-bold text-orange-600">{formatNumber(saTotalCost)} บาท</p>
+                </div>
+                <div className="bg-purple-100 p-4 rounded-lg shadow">
+                  <h2 className="text-lg font-semibold text-purple-800">Stock Day รวม (SA)</h2>
+                  <p className="text-2xl font-bold text-purple-600">{saAvgStockday} วัน</p>
+                </div>
+              </div>
+              <div className="w-full h-[500px]">
+                <Recharts.ResponsiveContainer width="100%" height="100%">
+                  <Recharts.ComposedChart data={saData} margin={{ top: 20, right: 30, left: 20, bottom: 100 }}>
+                    <Recharts.CartesianGrid strokeDasharray="3 3" />
+                    <Recharts.XAxis
+                      dataKey="ชื่อคลัง"
+                      angle={-45}
+                      textAnchor="end"
+                      interval={0}
+                      height={100}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Recharts.YAxis
+                      yAxisId="left"
+                      label={{ value: 'มูลค่า (บาท)', angle: -90, position: 'insideLeft', offset: -10 }}
+                      tickFormatter={formatNumber}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Recharts.YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      label={{ value: 'Stock Day (วัน)', angle: 90, position: 'insideRight', offset: -10 }}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Recharts.Tooltip
+                      formatter={(value, name) => {
+                        if (name === 'Stock Day' || name === 'เป้าหมาย 120 วัน') return [Math.round(value), 'วัน'];
+                        return [formatNumber(value), 'บาท'];
+                      }}
+                    />
+                    <Recharts.Legend verticalAlign="top" height={36} />
+                    <Recharts.Bar
+                      yAxisId="left"
+                      dataKey="มูลค่าคลัง"
+                      name="มูลค่าคลัง"
+                      stackId="a"
+                      fill="#15803D"
+                      barSize={20}
+                    />
+                    <Recharts.Bar
+                      yAxisId="left"
+                      dataKey="มูลค่าวิศวกรรม"
+                      name="มูลค่าวิศวกรรม"
+                      stackId="a"
+                      fill="#6B21A8"
+                      barSize={20}
+                    />
+                    <Recharts.Bar
+                      yAxisId="left"
+                      dataKey="ต้นทุนขาย"
+                      name="ต้นทุนขาย"
+                      fill="#F97316"
+                      barSize={20}
+                    />
+                    <Recharts.Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="Stock Day"
+                      name="Stock Day"
+                      stroke="#10B981"
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                    />
+                    <Recharts.ReferenceLine
+                      yAxisId="right"
+                      y={120}
+                      label={{ value: 'เป้าหมาย 120 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
+                      stroke="#DC2626"
+                      strokeDasharray="5 5"
+                      strokeWidth={2}
+                      ifOverflow="extendDomain"
+                    />
+                  </Recharts.ComposedChart>
+                </Recharts.ResponsiveContainer>
+              </div>
+            </div>
+
+
+            
+
+            <div className="mb-12">
+              <h2 className="text-2xl font-semibold text-blue-800 mb-4">
+                รายงานข้อมูล Sparepart ศูนย์ Company ({selectedMonthYear || 'ทุกเดือน'})
+              </h2>
+              <div className="overflow-x-auto">
+                <table className="w-full bg-white shadow-sm border-collapse">
+                  <thead>
+                    <tr className="bg-blue-900">
+                     <th rowSpan="2" className="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500 text-blue-900">ศูนย์</th>
+                      <th colspan="3" className="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">ต้นงวด</th>
+                      <th colspan="3" className="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">ปลายงวด</th>
+                      <th rowspan="2" className="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">ต้นทุนขาย</th>
+                      <th rowspan="2" className="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">Stock Day</th>
+                      <th rowspan="2" className="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">History</th>
+                    </tr>
+                    <tr className="bg-blue-900">
+                      <th className="p-2 text-center font-bold text-white text-base border border-gray-300 border-t border-blue-500">คลัง</th>
+                      <th className="p-2 text-center font-bold text-white text-base border border-gray-300 border-t border-blue-500">วิศวกรรม</th>
+                      <th className="p-2 text-center font-bold text-white text-base border border-gray-300 border-t border-blue-500">มูลค่ารวม</th>
+                      <th className="p-2 text-center font-bold text-white text-base border border-gray-300 border-t border-blue-500">คลัง</th>
+                      <th className="p-2 text-center font-bold text-white text-base border border-gray-300 border-t border-blue-500">วิศวกรรม</th>
+                      <th className="p-2 text-center font-bold text-white text-base border border-gray-300 border-t border-blue-500">มูลค่ารวม</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {companyData.length > 0 ? (
+                      companyData.map((item, index) => (
+                        <tr key={index} className={`transition-colors duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
+                          <td
+    className="p-2 text-center font-bold text-blue-900 border border-gray-300 cursor-pointer"
+    onClick={() => handleHistoryClick(item['ชื่อคลัง'])}
+  >
+    {item['ชื่อคลัง']}
+  </td>
+                          <td className={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดคลัง'])}</td>
+                          <td className={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดวิศวกรรม'])}</td>
+                          <td className={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดมูลค่ารวม'])}</td>
+                          <td className={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดคลัง'])}</td>
+                          <td className={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดวิศวกรรม'])}</td>
+                          <td className={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดมูลค่ารวม'])}</td>
+                          <td className={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นทุนขาย'])}</td>
+                          <td className={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : 'bg-green-100'}`}>
+                            {Math.round(item['Stock Day'] || 0) === 0 ? 'On Process' : Math.round(item['Stock Day'] || 0)}
+                          </td>
+                          <td className={`border border-gray-300 p-4 text-center ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>
+                            <button
+                              onClick={() => handleHistoryClick(item['ชื่อคลัง'])}
+                              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-base font-medium transition-colors duration-200"
+                            >
+                              ผลดำเนินการ
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="10" className="border border-gray-300 p-4 text-center text-gray-600 font-medium text-base">
+                          ไม่มีข้อมูล Company สำหรับ {selectedMonthYear || 'ทุกเดือน'}
+                        </td>
+                      </tr>
+                    )}
+                    {companyData.length > 0 && (
+                      <tr className="bg-blue-100 font-bold transition-colors duration-200">
+                        <td className="border border-gray-300 p-4 text-center text-blue-900 text-base bg-blue-100">ผลรวม</td>
+                        <td className="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(companySumBeginStock)}</td>
+                        <td className="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(companySumBeginEng)}</td>
+                        <td className="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(companySumBeginValue)}</td>
+                        <td className="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(companySumEndStock)}</td>
+                        <td className="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(companySumEndEng)}</td>
+                        <td className="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(companySumEndValue)}</td>
+                        <td className="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(companySumCost)}</td>
+                        <td className="border border-gray-300 p-4 text-right text-blue-900 text-base">{Math.round(companySumStockDay)}</td>
+                        <td className="border border-gray-300 p-4 text-center text-blue-900 text-base">-</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="mb-12">
+              <h2 className="text-2xl font-semibold text-green-800 mb-4">
+                รายงานข้อมูล Sparepart ศูนย์ SA ({selectedMonthYear || 'ทุกเดือน'})
+              </h2>
+              <div className="overflow-x-auto">
+                <table className="w-full bg-white shadow-sm border-collapse">
+                  <thead>
+                    <tr className="bg-blue-900">
+                      <th rowSpan="2" className="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500 text-blue-900">ศูนย์</th>
+                      <th colSpan="3" className="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">ต้นงวด</th>
+                      <th colSpan="3" className="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">ปลายงวด</th>
+                      <th rowSpan="2" className="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">ต้นทุนขาย</th>
+                      <th rowSpan="2" className="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">Stock Day</th>
+                      <th rowSpan="2" className="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">History</th>
+                    </tr>
+                    <tr className="bg-blue-900">
+                      <th className="p-2 text-center font-bold text-white text-base border border-gray-300 border-t border-blue-500">คลัง</th>
+                      <th className="p-2 text-center font-bold text-white text-base border border-gray-300 border-t border-blue-500">วิศวกรรม</th>
+                      <th className="p-2 text-center font-bold text-white text-base border border-gray-300 border-t border-blue-500">มูลค่ารวม</th>
+                      <th className="p-2 text-center font-bold text-white text-base border border-gray-300 border-t border-blue-500">คลัง</th>
+                      <th className="p-2 text-center font-bold text-white text-base border border-gray-300 border-t border-blue-500">วิศวกรรม</th>
+                      <th className="p-2 text-center font-bold text-white text-base border border-gray-300 border-t border-blue-500">มูลค่ารวม</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {saData.length > 0 ? (
+                      saData.map((item, index) => (
+                        <tr key={index} className={`transition-colors duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
+                         <td
+                          className="p-2 text-center font-bold text-blue-900 border border-gray-300 cursor-pointer"
+                          onClick={() => handleHistoryClick(item['ชื่อคลัง'])}
+                              >
+                            {item['ชื่อคลัง']}
+                        </td>
+                          <td className={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดคลัง'])}</td>
+                          <td className={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดวิศวกรรม'])}</td>
+                          <td className={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดมูลค่ารวม'])}</td>
+                          <td className={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดคลัง'])}</td>
+                          <td className={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดวิศวกรรม'])}</td>
+                          <td className={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดมูลค่ารวม'])}</td>
+                          <td className={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นทุนขาย'])}</td>
+                          <td className={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : 'bg-green-100'}`}>
+                            {Math.round(item['Stock Day'] || 0) === 0 ? 'On Process' : Math.round(item['Stock Day'] || 0)}
+                          </td>
+                          <td className={`border border-gray-300 p-4 text-center ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>
+                            <button
+                              onClick={() => handleHistoryClick(item['ชื่อคลัง'])}
+                              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-base font-medium transition-colors duration-200"
+                            >
+                              ผลดำเนินการ
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="10" className="border border-gray-300 p-4 text-center text-gray-600 font-medium text-base">
+                          ไม่มีข้อมูล SA สำหรับ {selectedMonthYear || 'ทุกเดือน'}
+                        </td>
+                      </tr>
+                    )}
+                    {saData.length > 0 && (
+                      <tr className="bg-blue-100 font-bold transition-colors duration-200">
+                        <td className="border border-gray-300 p-4 text-center text-blue-900 text-base bg-blue-100">ผลรวม</td>
+                        <td className="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(saSumBeginStock)}</td>
+                        <td className="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(saSumBeginEng)}</td>
+                        <td className="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(saSumBeginValue)}</td>
+                        <td className="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(saSumEndStock)}</td>
+                        <td className="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(saSumEndEng)}</td>
+                        <td className="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(saSumEndValue)}</td>
+                        <td className="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(saSumCost)}</td>
+                        <td className="border border-gray-300 p-4 text-right text-blue-900 text-base">{Math.round(saSumStockDay)}</td>
+                        <td className="border border-gray-300 p-4 text-center text-blue-900 text-base">-</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <HistoryPopup
+              isOpen={showHistoryPopup}
+              onClose={handleCloseHistoryPopup}
+              warehouse={selectedWarehouse}
+              data={data}
+            />
+            <SummaryHistoryPopup
+              isOpen={showSummaryHistoryPopup}
+              onClose={handleCloseSummaryHistoryPopup}
+              data={data}
+            />
+          </div>
+        </ErrorBoundary>
+      );
+    };
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
