@@ -118,9 +118,11 @@
     const stockEnd = parseFloat(latestData['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0;
     const engBegin = parseFloat(latestData['ต้นงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
     const engEnd = parseFloat(latestData['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
-    const totalStock = stockEnd;
+    const totalBeginx = parseFloat(latestData['ต้นงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0;
+    const totalEndx = parseFloat(latestData['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0;
+    const totalStock = totalBeginx + totalEndx;
     const totalEng = engEnd;
-    const totalValue = totalStock + totalEng;
+    const totalValue = totalBeginx + totalEndx;
     const cost = parseFloat(latestData['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0;
     const stockDay = Math.round(parseFloat(latestData['Stock Day']?.toString().replace(/,/g, '')) || 0);
 
@@ -532,40 +534,57 @@
 
     const SummaryHistoryPopup = ({ isOpen, onClose, data }) => {
       if (!isOpen) return null;
+     
+      const getDaysInLastMonth = (monthYear) => {
+  if (!monthYear) return 30;
+  let [month, year] = monthYear.split('/').map(Number);
+  year -= 543;
+  month--;
+  if (month === 0) {
+    month = 11;
+    year -= 1;
+  } else {
+    month -= 1;
+  }
+  const date = new Date(year, month + 1, 0);
+  return date.getDate();
+};
 
-      const summaryData = [...new Set(data.map(item => item['Mountyear']))]
-        .filter(my => my)
-        .map(mountyear => {
-          const mountyearData = data.filter(item => item['Mountyear'] === mountyear);
-          const totalValue = mountyearData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
-          const totalStock = mountyearData.reduce((sum, item) => {
-            const stockBegin = parseFloat(item['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0;
-            const stockEnd = parseFloat(item['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0;
-            return sum + (stockEnd);
-          }, 0);
-          const totalEng = mountyearData.reduce((sum, item) => {
-            const engBegin = parseFloat(item['ต้นงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
-            const engEnd = parseFloat(item['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
-            return sum + (engEnd);
-          }, 0);
-          const totalCost = mountyearData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
-          const stockDay = totalCost > 0 ? Math.round((totalValue / totalCost) * 30) : 0;
-          return {
-            Mountyear: mountyear,
-            'มูลค่าทั้งหมด': totalValue,
-            'มูลค่าคลังรวม': totalStock,
-            'มูลค่ารวมวิศวกรรม': totalEng,
-            'ต้นทุนขาย': totalCost,
-            'Stock Day': stockDay
-          };
-        })
-        .sort((a, b) => {
-          const [monthA, yearA] = a.Mountyear?.split('/') || ['01', '2000'];
-          const [monthB, yearB] = b.Mountyear?.split('/') || ['01', '2000'];
-          const dateA = new Date(`${yearA}-${monthA}-01`);
-          const dateB = new Date(`${yearB}-${monthB}-01`);
-          return dateA - dateB;
-        });
+const summaryData = [...new Set(data.map(item => item['Mountyear']))]
+  .filter(my => my)
+  .map(mountyear => {
+    const mountyearData = data.filter(item => item['Mountyear'] === mountyear);
+    const totalValuebegin = mountyearData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
+    const totalValueEnd = mountyearData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
+    const totalValue = (totalValuebegin + totalValueEnd) / 2;
+    const totalStock = mountyearData.reduce((sum, item) => {
+      const stockEnd = parseFloat(item['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0;
+      return sum + stockEnd;
+    }, 0);
+    const totalEng = mountyearData.reduce((sum, item) => {
+      const engEnd = parseFloat(item['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
+      return sum + engEnd;
+    }, 0);
+    const totalCost = mountyearData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
+    const stockDay = totalCost > 0 ? Math.round((totalValue / totalCost) * getDaysInLastMonth(mountyear)) : 0;
+
+    return {
+      Mountyear: mountyear,
+      'มูลค่าทั้งหมด': totalValue,
+      'มูลค่าคลังรวม': totalStock,
+      'มูลค่ารวมวิศวกรรม': totalEng,
+      'ต้นทุนขาย': totalCost,
+      'Stock Day': stockDay
+    };
+  })
+  .sort((a, b) => {
+    const [monthA, yearA] = a.Mountyear?.split('/') || ['01', '2000'];
+    const [monthB, yearB] = b.Mountyear?.split('/') || ['01', '2000'];
+    const dateA = new Date(`${yearA}-${monthA}-01`);
+    const dateB = new Date(`${yearB}-${monthB}-01`);
+    return dateA - dateB;
+  });
+
 
       const handlePrint = () => {
         if (!summaryData || summaryData.length === 0) {
@@ -851,7 +870,25 @@
         .sort((a, b) => (b['Stock Day'] || 0) - (a['Stock Day'] || 0));
       const companyChartData = companyData.filter(item => !['นวนคร', 'คลังวัตถุดิบ'].includes(item['ชื่อคลัง']));
 
-      const totalValue = filteredData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
+      const totalValuebegin = filteredData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
+      const totalValueEnd = filteredData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
+      const totalValue = (totalValuebegin + totalValueEnd)/2
+      const getDaysInLastMonth = (monthYear) => {
+        if (!monthYear) return 30; // Default 30 days if not specified
+	 let [month, year] = monthYear.split('/').map(Number);
+  	 year -= 543; // Convert Thai year (B.E.) to A.D.
+  	 month--; // JavaScript months are 0-based (0 = Jan)
+	 // Move to previous month
+  	 if (month === 0) {
+   	 month = 11; // December
+   	 year -= 1;
+  	 } else {
+   	 month -= 1;
+  	 }
+	 const date = new Date(year, month + 1, 0); // Last day of previous month
+ 	 return date.getDate(); // Number of days in that month
+	};
+
       const totalStock = filteredData.reduce((sum, item) => {
         const stockBegin = parseFloat(item['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0;
         const stockEnd = parseFloat(item['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0;
@@ -863,7 +900,7 @@
         return sum + engEnd;
       }, 0);
       const totalCost = filteredData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
-      const totalStockDay = totalCost > 0 ? Math.round((totalValue / totalCost) * 30) : 0;
+      const totalStockDay = totalCost > 0 ? Math.round((totalValue/totalCost)* getDaysInLastMonth(selectedMonthYear)) : 0;
 
       const companyTotalValue = companyData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
       const companyTotalStock = companyData.reduce((sum, item) => {
@@ -879,7 +916,7 @@
       const companyTotalCost = companyData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
       const companySumBeginValue = companyData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
       const companySumEndValue = companyData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
-      const companyAvgStockday = companyTotalCost > 0 ? Math.round((((companySumBeginValue + companySumEndValue)/2) / companyTotalCost) * 30) : 0;
+      const companyAvgStockday = companyTotalCost > 0 ? Math.round((((companySumBeginValue + companySumEndValue)/2) / companyTotalCost) * getDaysInLastMonth(selectedMonthYear)) : 0;
 
       const saTotalValue = saData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
       const saTotalStock = saData.reduce((sum, item) => {
@@ -895,7 +932,7 @@
       const saTotalCost = saData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
       const saSumBeginValue = saData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
       const saSumEndValue = saData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
-      const saAvgStockday = saTotalCost > 0 ? Math.round((((saSumEndValue + saSumBeginValue)/2) / saTotalCost) * 30) : 0;
+      const saAvgStockday = saTotalCost > 0 ? Math.round((((saSumEndValue + saSumBeginValue)/2) / saTotalCost) * getDaysInLastMonth(selectedMonthYear)) : 0;
 
       const nakhonData = companyData.find(item => item['ชื่อคลัง'] === 'นวนคร') || { 'ปลายงวดคลัง': 0 };
       const rawMaterialData = companyData.find(item => item['ชื่อคลัง'] === 'คลังวัตถุดิบ') || { 'ปลายงวดคลัง': 0 };
@@ -905,14 +942,14 @@
       const companySumEndStock = companyData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0), 0);
       const companySumEndEng = companyData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0), 0);
       const companySumCost = companyData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
-      const companySumStockDay = companySumCost > 0 ? Math.round((((companySumEndValue + companySumBeginValue)/2) / companySumCost) * 30) : 0;
+      const companySumStockDay = companySumCost > 0 ? Math.round((((companySumEndValue + companySumBeginValue)/2) / companySumCost)*getDaysInLastMonth(selectedMonthYear)) : 0;
 
       const saSumBeginStock = saData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0), 0);
       const saSumBeginEng = saData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0), 0);
       const saSumEndStock = saData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0), 0);
       const saSumEndEng = saData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0), 0);
       const saSumCost = saData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
-      const saSumStockDay = saSumCost > 0 ? Math.round((((saSumEndValue + saSumBeginValue)/2) / saSumCost) * 30) : 0;
+      const saSumStockDay = saSumCost > 0 ? Math.round((((saSumEndValue + saSumBeginValue)/2) / saSumCost) * getDaysInLastMonth(selectedMonthYear)) : 0;
 
       return (
         <ErrorBoundary>
