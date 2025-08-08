@@ -538,17 +538,11 @@
       const getDaysInLastMonth = (monthYear) => {
   if (!monthYear) return 30;
   let [month, year] = monthYear.split('/').map(Number);
-  year -= 543;
-  month--;
-  if (month === 0) {
-    month = 11;
-    year -= 1;
-  } else {
-    month -= 1;
-  }
-  const date = new Date(year, month + 1, 0);
+  year -= 543; // แปลงปีพ.ศ. เป็นค.ศ.
+  const date = new Date(year, month, 0); // ใช้เดือนปัจจุบัน
   return date.getDate();
 };
+
 
 const summaryData = [...new Set(data.map(item => item['Mountyear']))]
   .filter(my => my)
@@ -873,22 +867,13 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
       const totalValuebegin = filteredData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
       const totalValueEnd = filteredData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
       const totalValue = (totalValuebegin + totalValueEnd)/2
-      const getDaysInLastMonth = (monthYear) => {
-        if (!monthYear) return 30; // Default 30 days if not specified
-	 let [month, year] = monthYear.split('/').map(Number);
-  	 year -= 543; // Convert Thai year (B.E.) to A.D.
-  	 month--; // JavaScript months are 0-based (0 = Jan)
-	 // Move to previous month
-  	 if (month === 0) {
-   	 month = 11; // December
-   	 year -= 1;
-  	 } else {
-   	 month -= 1;
-  	 }
-	 const date = new Date(year, month + 1, 0); // Last day of previous month
- 	 return date.getDate(); // Number of days in that month
-	};
-
+     const getDaysInLastMonth = (monthYear) => {
+  if (!monthYear) return 30;
+  let [month, year] = monthYear.split('/').map(Number);
+  year -= 543; // แปลงปีพ.ศ. เป็นค.ศ.
+  const date = new Date(year, month, 0); // ใช้เดือนปัจจุบัน
+  return date.getDate();
+};
       const totalStock = filteredData.reduce((sum, item) => {
         const stockBegin = parseFloat(item['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0;
         const stockEnd = parseFloat(item['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0;
