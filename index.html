@@ -16,7 +16,6 @@
       size: A4 landscape;
       margin: 0;
     }
-
     @media print {
       html, body {
         margin: 0;
@@ -25,7 +24,6 @@
         height: 210mm;
         overflow: hidden;
       }
-
       .print-container {
         width: 210mm;
         height: 297mm;
@@ -35,23 +33,19 @@
       .chart-container {
         height: 150mm !important; /* ปรับให้กราฟใช้พื้นที่ประมาณครึ่งหนึ่งของ A4 */
       }
-
       .print-container * {
         max-width: 100%;
         box-sizing: border-box;
       }
-
       .w-full.h-\[400px\], .w-full.h-\[300px\] {
         height: 300px !important;
         width: 100% !important;
         overflow: visible !important;
       }
-
       .recharts-surface {
         transform: scale(0.9);
         transform-origin: top left;
       }
-
       .no-print {
         display: none !important;
       }
@@ -61,10 +55,8 @@
 <body class="bg-gray-100 font-sans">
   <div id="root" class="container mx-auto p-6"></div>
   <div id="print-root" style="display: none;"></div>
-
   <script type="text/babel">
     console.log('Script started loading');
-
     if (!window.React || !window.ReactDOM || !window.axios || !window.Recharts || !window.Babel) {
       document.getElementById('root').innerHTML = `
         <div class="flex justify-center items-center h-screen">
@@ -73,7 +65,6 @@
       `;
       throw new Error('Missing required libraries');
     }
-
     class ErrorBoundary extends React.Component {
       state = { error: null };
       static getDerivedStateFromError(error) {
@@ -93,17 +84,14 @@
         return this.props.children;
       }
     }
-
     const formatNumber = (num) => {
       if (isNaN(num) || num === null || num === undefined) return '0';
       if (num >= 1_000_000) return (num / 1_000_000).toFixed(2) + 'M';
       if (num >= 1_000) return (num / 1_000).toFixed(2) + 'K';
       return num.toFixed(0);
     };
-
     const PrintReport = ({ warehouse, historyData }) => {
     const limitedHistoryData = historyData.slice(-1);
-
     if (!limitedHistoryData || limitedHistoryData.length === 0) {
       return (
         <div class="print-container bg-white">
@@ -111,7 +99,6 @@
         </div>
       );
     }
-
     const latestData = limitedHistoryData[limitedHistoryData.length - 1] || {};
     const stockBegin = parseFloat(latestData['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0;
     const stockEnd = parseFloat(latestData['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0;
@@ -124,7 +111,6 @@
     const totalValue = totalBeginx + totalEndx;
     const cost = parseFloat(latestData['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0;
     const stockDay = Math.round(parseFloat(latestData['Stock Day']?.toString().replace(/,/g, '')) || 0);
-
     return (
       <div class="print-container bg-white">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
@@ -175,7 +161,7 @@
               />
               <Recharts.Tooltip
                 formatter={(value, name) => {
-                  if (name === 'Stock Day' || name === 'เป้าหมาย 120 วัน') return [Math.round(value), 'วัน'];
+                  if (name === 'Stock Day' || name === 'เป้าหมาย 180 วัน') return [Math.round(value), 'วัน'];
                   return [formatNumber(value), 'บาท'];
                 }}
               />
@@ -221,8 +207,8 @@
               </Recharts.Line>
               <Recharts.ReferenceLine
                 yAxisId="right"
-                y={120}
-                label={{ value: 'เป้าหมาย 120 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
+                y={180}
+                label={{ value: 'เป้าหมาย 180 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
                 stroke="#DC2626"
                 strokeDasharray="5 5"
                 strokeWidth={2}
@@ -234,7 +220,6 @@
       </div>
     );
   };
-
   const PrintSummaryReport = ({ historyData }) => {
     const limitedHistoryData = historyData.slice(-1);
     const latestData = limitedHistoryData[limitedHistoryData.length - 1] || {};
@@ -243,7 +228,6 @@
     const totalEng = parseFloat(latestData['มูลค่ารวมวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
     const totalCost = parseFloat(latestData['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0;
     const stockDay = Math.round(parseFloat(latestData['Stock Day']?.toString().replace(/,/g, '')) || 0);
-
     return (
       <div class="print-container bg-white">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
@@ -294,7 +278,7 @@
               />
               <Recharts.Tooltip
                 formatter={(value, name) => {
-                  if (name === 'Stock Day' || name === 'เป้าหมาย 120 วัน') return [Math.round(value), 'วัน'];
+                  if (name === 'Stock Day' || name === 'เป้าหมาย 180 วัน') return [Math.round(value), 'วัน'];
                   return [formatNumber(value), 'บาท'];
                 }}
               />
@@ -340,8 +324,8 @@
               </Recharts.Line>
               <Recharts.ReferenceLine
                 yAxisId="right"
-                y={120}
-                label={{ value: 'เป้าหมาย 120 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
+                y={180}
+                label={{ value: 'เป้าหมาย 180 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
                 stroke="#DC2626"
                 strokeDasharray="5 5"
                 strokeWidth={2}
@@ -353,10 +337,8 @@
       </div>
     );
   };
-
     const HistoryPopup = ({ isOpen, onClose, warehouse, data }) => {
       if (!isOpen) return null;
-
       const historyData = data
         .filter(item => item['ชื่อคลัง'] === warehouse)
         .map(item => {
@@ -378,22 +360,18 @@
           const dateB = new Date(`${yearB}-${monthB}-01`);
           return dateA - dateB;
         });
-
       const handlePrint = () => {
         if (!historyData || historyData.length === 0) {
           alert('ไม่มีข้อมูลสำหรับพิมพ์');
           return;
         }
-
         const printRoot = document.getElementById('print-root');
         if (!printRoot) {
           console.error('Print root element not found');
           return;
         }
-
         printRoot.style.display = 'block';
         printRoot.innerHTML = '';
-
         try {
           ReactDOM.render(
             <PrintReport warehouse={warehouse} historyData={historyData} />,
@@ -414,14 +392,12 @@
           alert('เกิดข้อผิดพลาดในการพิมพ์: ' + error.message);
         }
       };
-
       const latestData = historyData[historyData.length - 1] || {};
       const latestStock = latestData['มูลค่าคลังรวม'] || 0;
       const latestEng = latestData['มูลค่าวิศวกรรม'] || 0;
       const latestTotal = latestStock + latestEng;
       const latestCost = parseFloat(latestData['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0;
       const latestStockDay = latestData['Stock Day'] || 0;
-
       return (
         <div class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div class="bg-white rounded-lg shadow-xl w-[95%] max-w-6xl p-6 relative pt-20">
@@ -445,13 +421,10 @@
   <h3 class="text-base font-semibold text-blue-900">มูลค่ารวมทั้งหมด</h3>
   <p class="text-xl font-bold text-blue-600">{formatNumber(latestTotal)} บาท</p>
 </div>
-
-
               <div class="bg-green-200 p-4 rounded-lg shadow">
   <h3 class="text-base font-semibold text-green-900">มูลค่าคลังรวม</h3>
   <p class="text-xl font-bold text-green-700">{formatNumber(latestStock)} บาท</p>
 </div>
-
               <div class="bg-purple-100 p-4 rounded-lg shadow">
                 <h3 class="text-base font-semibold text-purple-800">มูลค่าวิศวกรรม</h3>
                 <p class="text-xl font-bold text-purple-600">{formatNumber(latestEng)} บาท</p>
@@ -491,7 +464,7 @@
                   />
                   <Recharts.Tooltip
                     formatter={(value, name) => {
-                      if (name === 'Stock Day' || name === 'เป้าหมาย 120 วัน') return [Math.round(value), 'วัน'];
+                      if (name === 'Stock Day' || name === 'เป้าหมาย 180 วัน') return [Math.round(value), 'วัน'];
                       return [formatNumber(value), 'บาท'];
                     }}
                   />
@@ -537,8 +510,8 @@
                   </Recharts.Line>
                   <Recharts.ReferenceLine
                     yAxisId="right"
-                    y={120}
-                    label={{ value: 'เป้าหมาย 120 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
+                    y={180}
+                    label={{ value: 'เป้าหมาย 180 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
                     stroke="#DC2626"
                     strokeDasharray="5 5"
                     strokeWidth={2}
@@ -551,10 +524,9 @@
         </div>
       );
     };
-
     const SummaryHistoryPopup = ({ isOpen, onClose, data }) => {
       if (!isOpen) return null;
-     
+    
       const getDaysInLastMonth = (monthYear) => {
   if (!monthYear) return 30;
   let [month, year] = monthYear.split('/').map(Number);
@@ -562,15 +534,13 @@
   const date = new Date(year, month, 0); // ใช้เดือนปัจจุบัน
   return date.getDate();
 };
-
-
 const summaryData = [...new Set(data.map(item => item['Mountyear']))]
   .filter(my => my)
   .map(mountyear => {
     const mountyearData = data.filter(item => item['Mountyear'] === mountyear);
     const totalValuebegin = mountyearData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
     const totalValueEnd = mountyearData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
-    const totalValue = (totalValuebegin + totalValueEnd) / 2;
+    const avgValue = (totalValuebegin + totalValueEnd) / 2;
     const totalStock = mountyearData.reduce((sum, item) => {
       const stockEnd = parseFloat(item['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0;
       return sum + stockEnd;
@@ -580,11 +550,10 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
       return sum + engEnd;
     }, 0);
     const totalCost = mountyearData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
-    const stockDay = totalCost > 0 ? Math.round((totalValue / totalCost) * getDaysInLastMonth(mountyear)) : 0;
-
+    const stockDay = totalCost > 0 ? Math.round((avgValue / totalCost) * getDaysInLastMonth(mountyear)) : 0;
     return {
       Mountyear: mountyear,
-      'มูลค่าทั้งหมด': totalValue,
+      'มูลค่าทั้งหมด': totalValueEnd,
       'มูลค่าคลังรวม': totalStock,
       'มูลค่ารวมวิศวกรรม': totalEng,
       'ต้นทุนขาย': totalCost,
@@ -598,23 +567,18 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
     const dateB = new Date(`${yearB}-${monthB}-01`);
     return dateA - dateB;
   });
-
-
       const handlePrint = () => {
         if (!summaryData || summaryData.length === 0) {
           alert('ไม่มีข้อมูลสำหรับพิมพ์');
           return;
         }
-
         const printRoot = document.getElementById('print-root');
         if (!printRoot) {
           console.error('Print root element not found');
           return;
         }
-
         printRoot.style.display = 'block';
         printRoot.innerHTML = '';
-
         try {
           ReactDOM.render(
             <PrintSummaryReport historyData={summaryData} />,
@@ -635,14 +599,12 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
           alert('เกิดข้อผิดพลาดในการพิมพ์: ' + error.message);
         }
       };
-
       const latestData = summaryData[summaryData.length - 1] || {};
       const latestTotalValue = latestData['มูลค่าทั้งหมด'] || 0;
       const latestStock = latestData['มูลค่าคลังรวม'] || 0;
       const latestEng = latestData['มูลค่ารวมวิศวกรรม'] || 0;
       const latestCost = latestData['ต้นทุนขาย'] || 0;
       const latestStockDay = latestData['Stock Day'] || 0;
-
       return (
         <div class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div class="bg-white rounded-lg shadow-xl w-[95%] max-w-6xl p-6 relative pt-20">
@@ -666,13 +628,10 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
   <h3 class="text-base font-semibold text-blue-900">มูลค่ารวมทั้งหมด</h3>
   <p class="text-xl font-bold text-blue-600">{formatNumber(latestTotalValue)} บาท</p>
 </div>
-
-
               <div class="bg-green-200 p-4 rounded-lg shadow">
   <h3 class="text-base font-semibold text-green-900">มูลค่าคลังรวม</h3>
   <p class="text-xl font-bold text-green-700">{formatNumber(latestStock)} บาท</p>
 </div>
-
               <div class="bg-purple-100 p-4 rounded-lg shadow">
                 <h3 class="text-base font-semibold text-purple-800">มูลค่ารวมวิศวกรรม</h3>
                 <p class="text-xl font-bold text-purple-600">{formatNumber(latestEng)} บาท</p>
@@ -712,7 +671,7 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                   />
                   <Recharts.Tooltip
                     formatter={(value, name) => {
-                      if (name === 'Stock Day' || name === 'เป้าหมาย 120 วัน') return [Math.round(value), 'วัน'];
+                      if (name === 'Stock Day' || name === 'เป้าหมาย 180 วัน') return [Math.round(value), 'วัน'];
                       return [formatNumber(value), 'บาท'];
                     }}
                   />
@@ -758,8 +717,8 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                   </Recharts.Line>
                   <Recharts.ReferenceLine
                     yAxisId="right"
-                    y={120}
-                    label={{ value: 'เป้าหมาย 120 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
+                    y={180}
+                    label={{ value: 'เป้าหมาย 180 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
                     stroke="#DC2626"
                     strokeDasharray="5 5"
                     strokeWidth={2}
@@ -772,7 +731,6 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
         </div>
       );
     };
-
     const App = () => {
       const [data, setData] = React.useState([]);
       const [filteredData, setFilteredData] = React.useState([]);
@@ -783,10 +741,8 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
       const [showHistoryPopup, setShowHistoryPopup] = React.useState(false);
       const [selectedWarehouse, setSelectedWarehouse] = React.useState('');
       const [showSummaryHistoryPopup, setShowSummaryHistoryPopup] = React.useState(false);
-
       React.useEffect(() => {
         const url = 'https://opensheet.elk.sh/1r418cqPa92z1_tO62z369pvQrzD3MVlaAfISMXSGFMc/Web';
-
         axios.get(url)
           .then(response => {
             const rows = response.data;
@@ -795,7 +751,6 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
               setLoading(false);
               return;
             }
-
             const cleanedData = rows.map(row => {
               const beginValue = parseFloat(row['ต้นงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0;
               const endValue = parseFloat(row['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0;
@@ -822,7 +777,6 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                 'มูลค่าวิศวกรรม': (engBegin + engEnd) / 2
               };
             });
-
             const monthYearSet = new Set(cleanedData.map(row => row['Mountyear']));
             const monthYearArray = [...monthYearSet].filter(my => my).sort((a, b) => {
               const [monthA, yearA] = a?.split('/') || ['01', '2000'];
@@ -831,7 +785,6 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
               const dateB = new Date(`${yearB}-${monthB}-01`);
               return dateB - dateA;
             });
-
             const latestMonthYear = monthYearArray[0] || '';
             setMonthYears(monthYearArray);
             setData(cleanedData);
@@ -844,7 +797,6 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
             setLoading(false);
           });
       }, []);
-
       React.useEffect(() => {
         if (selectedMonthYear) {
           setFilteredData(data.filter(row => row['Mountyear'] === selectedMonthYear));
@@ -852,21 +804,17 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
           setFilteredData(data);
         }
       }, [selectedMonthYear, data]);
-
       const handleHistoryClick = (warehouse) => {
         setSelectedWarehouse(warehouse);
         setShowHistoryPopup(true);
       };
-
       const handleCloseHistoryPopup = () => {
         setShowHistoryPopup(false);
         setSelectedWarehouse('');
       };
-
       const handleCloseSummaryHistoryPopup = () => {
         setShowSummaryHistoryPopup(false);
       };
-
       if (loading) {
         return (
           <div class="flex justify-center items-center h-screen">
@@ -874,7 +822,6 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
           </div>
         );
       }
-
       if (error) {
         return (
           <div class="flex justify-center items-center h-screen">
@@ -882,7 +829,6 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
           </div>
         );
       }
-
       const companyData = filteredData
         .filter((item) => item['StatusSAcom'] === 'Company')
         .sort((a, b) => (b['Stock Day'] || 0) - (a['Stock Day'] || 0));
@@ -890,10 +836,9 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
         .filter((item) => item['StatusSAcom'] === 'SA')
         .sort((a, b) => (b['Stock Day'] || 0) - (a['Stock Day'] || 0));
       const companyChartData = companyData.filter(item => !['นวนคร', 'คลังวัตถุดิบ'].includes(item['ชื่อคลัง']));
-
       const totalValuebegin = filteredData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
       const totalValueEnd = filteredData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
-      const totalValue = (totalValuebegin + totalValueEnd)/2
+      const totalValue = totalValueEnd;
      const getDaysInLastMonth = (monthYear) => {
   if (!monthYear) return 30;
   let [month, year] = monthYear.split('/').map(Number);
@@ -912,8 +857,7 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
         return sum + engEnd;
       }, 0);
       const totalCost = filteredData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
-      const totalStockDay = totalCost > 0 ? Math.round((totalValue/totalCost)* getDaysInLastMonth(selectedMonthYear)) : 0;
-
+      const totalStockDay = totalCost > 0 ? Math.round(((totalValuebegin + totalValueEnd) / 2 / totalCost) * getDaysInLastMonth(selectedMonthYear)) : 0;
       const companyTotalValue = companyData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
       const companyTotalStock = companyData.reduce((sum, item) => {
         const stockBegin = parseFloat(item['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0;
@@ -929,7 +873,6 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
       const companySumBeginValue = companyData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
       const companySumEndValue = companyData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
       const companyAvgStockday = companyTotalCost > 0 ? Math.round((((companySumBeginValue + companySumEndValue)/2) / companyTotalCost) * getDaysInLastMonth(selectedMonthYear)) : 0;
-
       const saTotalValue = saData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
       const saTotalStock = saData.reduce((sum, item) => {
         const stockBegin = parseFloat(item['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0;
@@ -945,24 +888,20 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
       const saSumBeginValue = saData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
       const saSumEndValue = saData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
       const saAvgStockday = saTotalCost > 0 ? Math.round((((saSumEndValue + saSumBeginValue)/2) / saTotalCost) * getDaysInLastMonth(selectedMonthYear)) : 0;
-
       const nakhonData = companyData.find(item => item['ชื่อคลัง'] === 'นวนคร') || { 'ปลายงวดคลัง': 0 };
       const rawMaterialData = companyData.find(item => item['ชื่อคลัง'] === 'คลังวัตถุดิบ') || { 'ปลายงวดคลัง': 0 };
-
       const companySumBeginStock = companyData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0), 0);
       const companySumBeginEng = companyData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0), 0);
       const companySumEndStock = companyData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0), 0);
       const companySumEndEng = companyData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0), 0);
       const companySumCost = companyData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
       const companySumStockDay = companySumCost > 0 ? Math.round((((companySumEndValue + companySumBeginValue)/2) / companySumCost)*getDaysInLastMonth(selectedMonthYear)) : 0;
-
       const saSumBeginStock = saData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดคลัง']?.toString().replace(/,/g, '')) || 0), 0);
       const saSumBeginEng = saData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0), 0);
       const saSumEndStock = saData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0), 0);
       const saSumEndEng = saData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0), 0);
       const saSumCost = saData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
       const saSumStockDay = saSumCost > 0 ? Math.round((((saSumEndValue + saSumBeginValue)/2) / saSumCost) * getDaysInLastMonth(selectedMonthYear)) : 0;
-
       return (
         <ErrorBoundary>
           <div class="bg-white rounded-lg shadow-lg p-6">
@@ -970,7 +909,6 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
             <h1 class="text-3xl font-bold text-center text-blue-800 mb-6">
               รายงานมูลค่า Sparepart และ Stock Day ของแต่ละศูนย์
             </h1>
-
             <div class="mb-8 flex flex-row flex-wrap items-center justify-start gap-6">
               <label class="text-2xl font-bold text-blue-900">เลือกเดือน-ปี:</label>
               <div class="relative w-full max-w-[220px]">
@@ -994,7 +932,7 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                   </svg>
                 </div>
               </div>
-              <span class="w-[220px] text-2xl font-bold text-blue-900 bg-blue-50 border-2 border-blue-500 px-4 py-4 rounded-lg shadow-md">เป้าหมาย 120 วัน</span>
+              <span class="w-[220px] text-2xl font-bold text-blue-900 bg-blue-50 border-2 border-blue-500 px-4 py-4 rounded-lg shadow-md">เป้าหมาย 180 วัน</span>
               <button
                 onClick={() => setShowSummaryHistoryPopup(true)}
                 class="w-[220px] text-2xl font-bold text-white bg-blue-500 border-2 border-blue-700 px-4 py-4 rounded-lg shadow-md hover:bg-blue-600 transition-all duration-300"
@@ -1002,7 +940,6 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                 ผลดำเนินการ
               </button>
             </div>
-
             <div class="mb-8">
               <h2 class="text-2xl font-semibold text-blue-800 mb-4 tracking-wide leading-relaxed shadow-md">รายงานมูลค่า SPAREPART ทั้งหมด</h2>
               <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -1028,7 +965,6 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                 </div>
               </div>
             </div>
-
             <div class="mb-12">
             <h2 class="text-2xl font-semibold text-blue-800 mb-4 tracking-wide leading-relaxed shadow-md">รายงานมูลค่า SPAREPART ศูนย์ Company</h2>
               <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
@@ -1040,7 +976,6 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
   <h2 class="text-lg font-semibold text-green-900">มูลค่าคลังรวม (Company)</h2>
   <p class="text-2xl font-bold text-green-700">{formatNumber(companyTotalStock)} บาท</p>
 </div>
-
                 <div class="bg-purple-100 p-4 rounded-lg shadow">
                   <h2 class="text-lg font-semibold text-purple-800">มูลค่ารวมวิศวกรรม (Company)</h2>
                   <p class="text-2xl font-bold text-purple-600">{formatNumber(companyTotalEng)} บาท</p>
@@ -1090,7 +1025,7 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                     />
                     <Recharts.Tooltip
                       formatter={(value, name) => {
-                        if (name === 'Stock Day' || name === 'เป้าหมาย 120 วัน') return [Math.round(value), 'วัน'];
+                        if (name === 'Stock Day' || name === 'เป้าหมาย 180 วัน') return [Math.round(value), 'วัน'];
                         return [formatNumber(value), 'บาท'];
                       }}
                     />
@@ -1136,8 +1071,8 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                     </Recharts.Line>
                     <Recharts.ReferenceLine
                       yAxisId="right"
-                      y={120}
-                      label={{ value: 'เป้าหมาย 120 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
+                      y={180}
+                      label={{ value: 'เป้าหมาย 180 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
                       stroke="#DC2626"
                       strokeDasharray="5 5"
                       strokeWidth={2}
@@ -1147,7 +1082,6 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                 </Recharts.ResponsiveContainer>
               </div>
             </div>
-
             <div class="mb-12">
               <h2 class="text-2xl font-semibold text-blue-800 mb-4 tracking-wide leading-relaxed shadow-md">รายงานมูลค่า SPAREPART ศูนย์ SA</h2>
               <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
@@ -1198,7 +1132,7 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                     />
                     <Recharts.Tooltip
                       formatter={(value, name) => {
-                        if (name === 'Stock Day' || name === 'เป้าหมาย 120 วัน') return [Math.round(value), 'วัน'];
+                        if (name === 'Stock Day' || name === 'เป้าหมาย 180 วัน') return [Math.round(value), 'วัน'];
                         return [formatNumber(value), 'บาท'];
                       }}
                     />
@@ -1244,8 +1178,8 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                     </Recharts.Line>
                     <Recharts.ReferenceLine
                       yAxisId="right"
-                      y={120}
-                      label={{ value: 'เป้าหมาย 120 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
+                      y={180}
+                      label={{ value: 'เป้าหมาย 180 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
                       stroke="#DC2626"
                       strokeDasharray="5 5"
                       strokeWidth={2}
@@ -1255,10 +1189,7 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                 </Recharts.ResponsiveContainer>
               </div>
             </div>
-
-
-            
-
+           
             <div class="mb-12">
               <h2 class="text-2xl font-semibold text-blue-800 mb-4">
                 รายงานข้อมูล Sparepart ศูนย์ Company ({selectedMonthYear || 'ทุกเดือน'})
@@ -1293,17 +1224,17 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
   >
     {item['ชื่อคลัง']}
   </td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดคลัง'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดวิศวกรรม'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดมูลค่ารวม'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดคลัง'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดวิศวกรรม'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดมูลค่ารวม'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นทุนขาย'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : 'bg-green-100'}`}>
+                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดคลัง'])}</td>
+                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดวิศวกรรม'])}</td>
+                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดมูลค่ารวม'])}</td>
+                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดคลัง'])}</td>
+                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดวิศวกรรม'])}</td>
+                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดมูลค่ารวม'])}</td>
+                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นทุนขาย'])}</td>
+                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : 'bg-green-100'}`}>
                             {Math.round(item['Stock Day'] || 0) === 0 ? 'On Process' : Math.round(item['Stock Day'] || 0)}
                           </td>
-                          <td class={`border border-gray-300 p-4 text-center ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>
+                          <td class={`border border-gray-300 p-4 text-center ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>
                             <button
                               onClick={() => handleHistoryClick(item['ชื่อคลัง'])}
                               class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-base font-medium transition-colors duration-200"
@@ -1338,7 +1269,6 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                 </table>
               </div>
             </div>
-
             <div class="mb-12">
               <h2 class="text-2xl font-semibold text-green-800 mb-4">
                 รายงานข้อมูล Sparepart ศูนย์ SA ({selectedMonthYear || 'ทุกเดือน'})
@@ -1373,17 +1303,17 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                               >
                             {item['ชื่อคลัง']}
                         </td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดคลัง'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดวิศวกรรม'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดมูลค่ารวม'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดคลัง'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดวิศวกรรม'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดมูลค่ารวม'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นทุนขาย'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : 'bg-green-100'}`}>
+                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดคลัง'])}</td>
+                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดวิศวกรรม'])}</td>
+                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดมูลค่ารวม'])}</td>
+                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดคลัง'])}</td>
+                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดวิศวกรรม'])}</td>
+                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดมูลค่ารวม'])}</td>
+                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นทุนขาย'])}</td>
+                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : 'bg-green-100'}`}>
                             {Math.round(item['Stock Day'] || 0) === 0 ? 'On Process' : Math.round(item['Stock Day'] || 0)}
                           </td>
-                          <td class={`border border-gray-300 p-4 text-center ${Math.round(item['Stock Day'] || 0) > 120 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>
+                          <td class={`border border-gray-300 p-4 text-center ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>
                             <button
                               onClick={() => handleHistoryClick(item['ชื่อคลัง'])}
                               class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-base font-medium transition-colors duration-200"
@@ -1418,7 +1348,6 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                 </table>
               </div>
             </div>
-
             <HistoryPopup
               isOpen={showHistoryPopup}
               onClose={handleCloseHistoryPopup}
@@ -1434,7 +1363,6 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
         </ErrorBoundary>
       );
     };
-
     ReactDOM.render(<App />, document.getElementById('root'));
   </script>
 </body>
