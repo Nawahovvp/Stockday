@@ -181,14 +181,14 @@
                 stackId="a"
                 fill="#6B21A8"
                 barSize={20}
-              />
-              <Recharts.Bar
-                yAxisId="left"
-                dataKey="ต้นทุนขาย"
-                name="ต้นทุนขาย"
-                fill="#F97316"
-                barSize={20}
-              />
+              >
+                <Recharts.LabelList
+                  dataKey="ปลายงวดมูลค่ารวม"
+                  position="top"
+                  formatter={formatNumber}
+                  style={{ fontSize: 12, fill: 'black', fontWeight: 'bold' }}
+                />
+              </Recharts.Bar>
               <Recharts.Line
                 yAxisId="right"
                 type="monotone"
@@ -298,14 +298,14 @@
                 stackId="a"
                 fill="#6B21A8"
                 barSize={20}
-              />
-              <Recharts.Bar
-                yAxisId="left"
-                dataKey="ต้นทุนขาย"
-                name="ต้นทุนขาย"
-                fill="#F97316"
-                barSize={20}
-              />
+              >
+                <Recharts.LabelList
+                  dataKey="ปลายงวดมูลค่ารวม"
+                  position="top"
+                  formatter={formatNumber}
+                  style={{ fontSize: 12, fill: 'black', fontWeight: 'bold' }}
+                />
+              </Recharts.Bar>
               <Recharts.Line
                 yAxisId="right"
                 type="monotone"
@@ -484,14 +484,14 @@
                     stackId="a"
                     fill="#6B21A8"
                     barSize={20}
-                  />
-                  <Recharts.Bar
-                    yAxisId="left"
-                    dataKey="ต้นทุนขาย"
-                    name="ต้นทุนขาย"
-                    fill="#F97316"
-                    barSize={20}
-                  />
+                  >
+                    <Recharts.LabelList
+                      dataKey="ปลายงวดมูลค่ารวม"
+                      position="top"
+                      formatter={formatNumber}
+                      style={{ fontSize: 12, fill: 'black', fontWeight: 'bold' }}
+                    />
+                  </Recharts.Bar>
                   <Recharts.Line
                     yAxisId="right"
                     type="monotone"
@@ -526,7 +526,7 @@
     };
     const SummaryHistoryPopup = ({ isOpen, onClose, data }) => {
       if (!isOpen) return null;
-    
+   
       const getDaysInLastMonth = (monthYear) => {
   if (!monthYear) return 30;
   let [month, year] = monthYear.split('/').map(Number);
@@ -540,7 +540,7 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
     const mountyearData = data.filter(item => item['Mountyear'] === mountyear);
     const totalValuebegin = mountyearData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
     const totalValueEnd = mountyearData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
-    const avgValue = (totalValuebegin + totalValueEnd) / 2;
+    const totalValue = (totalValuebegin + totalValueEnd) / 2;
     const totalStock = mountyearData.reduce((sum, item) => {
       const stockEnd = parseFloat(item['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0;
       return sum + stockEnd;
@@ -550,14 +550,15 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
       return sum + engEnd;
     }, 0);
     const totalCost = mountyearData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
-    const stockDay = totalCost > 0 ? Math.round((avgValue / totalCost) * getDaysInLastMonth(mountyear)) : 0;
+    const stockDay = totalCost > 0 ? Math.round((totalValue / totalCost) * getDaysInLastMonth(mountyear)) : 0;
     return {
       Mountyear: mountyear,
-      'มูลค่าทั้งหมด': totalValueEnd,
+      'มูลค่าทั้งหมด': totalValue,
       'มูลค่าคลังรวม': totalStock,
       'มูลค่ารวมวิศวกรรม': totalEng,
       'ต้นทุนขาย': totalCost,
-      'Stock Day': stockDay
+      'Stock Day': stockDay,
+      'ปลายงวดมูลค่ารวม': totalValueEnd
     };
   })
   .sort((a, b) => {
@@ -691,14 +692,14 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                     stackId="a"
                     fill="#6B21A8"
                     barSize={20}
-                  />
-                  <Recharts.Bar
-                    yAxisId="left"
-                    dataKey="ต้นทุนขาย"
-                    name="ต้นทุนขาย"
-                    fill="#F97316"
-                    barSize={20}
-                  />
+                  >
+                    <Recharts.LabelList
+                      dataKey="ปลายงวดมูลค่ารวม"
+                      position="top"
+                      formatter={formatNumber}
+                      style={{ fontSize: 12, fill: 'black', fontWeight: 'bold' }}
+                    />
+                  </Recharts.Bar>
                   <Recharts.Line
                     yAxisId="right"
                     type="monotone"
@@ -772,9 +773,9 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                 'Mountyear': row['Mountyear']?.trim() || '',
                 'ชื่อคลัง': row['ชื่อคลัง']?.trim() || '',
                 'StatusSAcom': row['StatusSAcom']?.trim() || '',
-                'มูลค่าคลังรวม': (stockBegin + stockEnd) / 2,
-                'มูลค่าคลัง': (stockBegin + stockEnd) / 2,
-                'มูลค่าวิศวกรรม': (engBegin + engEnd) / 2
+                'มูลค่าคลังรวม': stockEnd,
+                'มูลค่าคลัง': stockEnd,
+                'มูลค่าวิศวกรรม': engEnd
               };
             });
             const monthYearSet = new Set(cleanedData.map(row => row['Mountyear']));
@@ -836,6 +837,7 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
         .filter((item) => item['StatusSAcom'] === 'SA')
         .sort((a, b) => (b['Stock Day'] || 0) - (a['Stock Day'] || 0));
       const companyChartData = companyData.filter(item => !['นวนคร', 'คลังวัตถุดิบ'].includes(item['ชื่อคลัง']));
+      const combinedChartData = [...companyChartData, ...saData];
       const totalValuebegin = filteredData.reduce((sum, item) => sum + (parseFloat(item['ต้นงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
       const totalValueEnd = filteredData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0), 0);
       const totalValue = totalValueEnd;
@@ -966,6 +968,91 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
               </div>
             </div>
             <div class="mb-12">
+              <h2 class="text-2xl font-semibold text-blue-800 mb-4 tracking-wide leading-relaxed shadow-md">รายงานมูลค่า SPAREPART รวม Company และ SA</h2>
+              <div class="w-full h-[500px]">
+                <Recharts.ResponsiveContainer width="100%" height="100%">
+                  <Recharts.ComposedChart data={combinedChartData} margin={{ top: 20, right: 30, left: 20, bottom: 100 }}>
+                    <Recharts.CartesianGrid strokeDasharray="3 3" />
+                    <Recharts.XAxis
+                      dataKey="ชื่อคลัง"
+                      angle={-45}
+                      textAnchor="end"
+                      interval={0}
+                      height={100}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Recharts.YAxis
+                      yAxisId="left"
+                      label={{ value: 'มูลค่า (บาท)', angle: -90, position: 'insideLeft', offset: -10 }}
+                      tickFormatter={formatNumber}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Recharts.YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      label={{ value: 'Stock Day (วัน)', angle: 90, position: 'insideRight', offset: -10 }}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Recharts.Tooltip
+                      formatter={(value, name) => {
+                        if (name === 'Stock Day' || name === 'เป้าหมาย 180 วัน') return [Math.round(value), 'วัน'];
+                        return [formatNumber(value), 'บาท'];
+                      }}
+                    />
+                    <Recharts.Legend verticalAlign="top" height={36} />
+                    <Recharts.Bar
+                      yAxisId="left"
+                      dataKey="มูลค่าคลัง"
+                      name="มูลค่าคลัง"
+                      stackId="a"
+                      fill="#15803D"
+                      barSize={20}
+                    />
+                    <Recharts.Bar
+                      yAxisId="left"
+                      dataKey="มูลค่าวิศวกรรม"
+                      name="มูลค่าวิศวกรรม"
+                      stackId="a"
+                      fill="#6B21A8"
+                      barSize={20}
+                    >
+                      <Recharts.LabelList
+                        dataKey="ปลายงวดมูลค่ารวม"
+                        position="top"
+                        formatter={formatNumber}
+                        style={{ fontSize: 12, fill: 'black', fontWeight: 'bold' }}
+                      />
+                    </Recharts.Bar>
+                    <Recharts.Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="Stock Day"
+                      name="Stock Day"
+                      stroke="#10B981"
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                    >
+                      <Recharts.LabelList
+                        dataKey="Stock Day"
+                        position="top"
+                        formatter={(value) => `${Math.round(value)} วัน`}
+                        style={{ fontSize: 12, fill: '#fa2a1b', fontWeight: 'bold' }}
+                      />
+                    </Recharts.Line>
+                    <Recharts.ReferenceLine
+                      yAxisId="right"
+                      y={180}
+                      label={{ value: 'เป้าหมาย 180 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
+                      stroke="#DC2626"
+                      strokeDasharray="5 5"
+                      strokeWidth={2}
+                      ifOverflow="extendDomain"
+                    />
+                  </Recharts.ComposedChart>
+                </Recharts.ResponsiveContainer>
+              </div>
+            </div>
+            <div class="mb-12">
             <h2 class="text-2xl font-semibold text-blue-800 mb-4 tracking-wide leading-relaxed shadow-md">รายงานมูลค่า SPAREPART ศูนย์ Company</h2>
               <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
                 <div class="bg-blue-100 p-4 rounded-lg shadow">
@@ -1045,14 +1132,14 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                       stackId="a"
                       fill="#6B21A8"
                       barSize={20}
-                    />
-                    <Recharts.Bar
-                      yAxisId="left"
-                      dataKey="ต้นทุนขาย"
-                      name="ต้นทุนขาย"
-                      fill="#F97316"
-                      barSize={20}
-                    />
+                    >
+                      <Recharts.LabelList
+                        dataKey="ปลายงวดมูลค่ารวม"
+                        position="top"
+                        formatter={formatNumber}
+                        style={{ fontSize: 12, fill: 'black', fontWeight: 'bold' }}
+                      />
+                    </Recharts.Bar>
                     <Recharts.Line
                       yAxisId="right"
                       type="monotone"
@@ -1152,14 +1239,14 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                       stackId="a"
                       fill="#6B21A8"
                       barSize={20}
-                    />
-                    <Recharts.Bar
-                      yAxisId="left"
-                      dataKey="ต้นทุนขาย"
-                      name="ต้นทุนขาย"
-                      fill="#F97316"
-                      barSize={20}
-                    />
+                    >
+                      <Recharts.LabelList
+                        dataKey="ปลายงวดมูลค่ารวม"
+                        position="top"
+                        formatter={formatNumber}
+                        style={{ fontSize: 12, fill: 'black', fontWeight: 'bold' }}
+                      />
+                    </Recharts.Bar>
                     <Recharts.Line
                       yAxisId="right"
                       type="monotone"
@@ -1189,7 +1276,7 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                 </Recharts.ResponsiveContainer>
               </div>
             </div>
-           
+          
             <div class="mb-12">
               <h2 class="text-2xl font-semibold text-blue-800 mb-4">
                 รายงานข้อมูล Sparepart ศูนย์ Company ({selectedMonthYear || 'ทุกเดือน'})
