@@ -732,6 +732,68 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
         </div>
       );
     };
+    const SevenElevenChart = ({ selectedMonthYear }) => {
+      const [chartData, setChartData] = React.useState([]);
+      const [loading, setLoading] = React.useState(true);
+      React.useEffect(() => {
+        if (!selectedMonthYear) {
+          setChartData([]);
+          setLoading(false);
+          return;
+        }
+        const url = 'https://opensheet.elk.sh/1r418cqPa92z1_tO62z369pvQrzD3MVlaAfISMXSGFMc/StockDayindex';
+        axios.get(url).then(response => {
+          const rows = response.data;
+          const filtered = rows.filter(row => row.Mountyear === selectedMonthYear && row['Store Value'] !== 'On Process');
+          const processed = filtered.map(row => ({
+            ...row,
+            Status: row.Plant.startsWith('SA-') ? 'SA' : 'COMPANY',
+            Store: parseFloat(row.Store?.toString().replace(/,/g, '')) || 0,
+            StoreValue: parseFloat(row['Store Value']?.toString().replace(/,/g, '')) || 0,
+            CostStore: parseFloat(row.CostStore?.toString().replace(/,/g, '')) || 0,
+          })).sort((a, b) => {
+            if (a.Status !== b.Status) return a.Status.localeCompare(b.Status);
+            return b.StoreValue - a.StoreValue;
+          });
+          setChartData(processed);
+          setLoading(false);
+        }).catch(err => {
+          console.error(err);
+          setLoading(false);
+        });
+      }, [selectedMonthYear]);
+      if (loading) return <div class="text-center text-gray-600">กำลังโหลดข้อมูล 7-11...</div>;
+      if (chartData.length === 0) return <div class="text-center text-gray-600">ไม่มีข้อมูลสำหรับเดือนที่เลือก</div>;
+      return (
+        <div class="mb-12">
+          <h2 class="text-2xl font-semibold text-blue-800 mb-4 tracking-wide leading-relaxed shadow-md">รายงานมูลค่าการใช้อะไหล่ต่อสาขา 7-11 ({selectedMonthYear})</h2>
+          <div class="w-full h-[500px]">
+            <Recharts.ResponsiveContainer width="100%" height="100%">
+              <Recharts.ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 100 }}>
+                <Recharts.CartesianGrid strokeDasharray="3 3" />
+                <Recharts.XAxis dataKey="Plant" angle={-45} textAnchor="end" interval={0} height={100} tick={{ fontSize: 12 }} />
+                <Recharts.YAxis yAxisId="left" label={{ value: 'จำนวนสาขา', angle: -90, position: 'insideLeft', offset: -10 }} tickFormatter={formatNumber} tick={{ fontSize: 12 }} />
+                <Recharts.YAxis yAxisId="right" orientation="right" label={{ value: 'มูลค่า (บาท)', angle: 90, position: 'insideRight', offset: -10 }} tickFormatter={formatNumber} tick={{ fontSize: 12 }} />
+                <Recharts.Tooltip
+                  formatter={(value, name) => {
+                    if (name === 'สาขา') return [formatNumber(value), 'สาขา'];
+                    return [formatNumber(value), 'บาท'];
+                  }}
+                />
+                <Recharts.Legend verticalAlign="top" height={36} />
+                <Recharts.Bar yAxisId="left" dataKey="Store" name="สาขา" fill="#ADD8E6" barSize={20} />
+                <Recharts.Line yAxisId="right" type="monotone" dataKey="StoreValue" name="มูลค่าคงเหลือต่อสาขา" stroke="#00008B" strokeWidth={2} dot={{ r: 4 }}>
+                  <Recharts.LabelList dataKey="StoreValue" position="top" formatter={formatNumber} style={{ fontSize: 12, fill: 'black', fontWeight: 'bold' }} />
+                </Recharts.Line>
+                <Recharts.Line yAxisId="right" type="monotone" dataKey="CostStore" name="มูลค่าใช้จริงต่อสาขา" stroke="#E74C3C" strokeWidth={2} dot={{ r: 4 }}>
+                  <Recharts.LabelList dataKey="CostStore" position="top" formatter={formatNumber} style={{ fontSize: 12, fill: 'black', fontWeight: 'bold' }} />
+                </Recharts.Line>
+              </Recharts.ComposedChart>
+            </Recharts.ResponsiveContainer>
+          </div>
+        </div>
+      );
+    };
     const App = () => {
       const [data, setData] = React.useState([]);
       const [filteredData, setFilteredData] = React.useState([]);
@@ -1086,88 +1148,6 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                   <p class="text-2xl font-bold text-yellow-600">{formatNumber(rawMaterialData['ปลายงวดคลัง'])} บาท</p>
                 </div>
               </div>
-              <div class="w-full h-[500px]">
-                <Recharts.ResponsiveContainer width="100%" height="100%">
-                  <Recharts.ComposedChart data={companyChartData} margin={{ top: 20, right: 30, left: 20, bottom: 100 }}>
-                    <Recharts.CartesianGrid strokeDasharray="3 3" />
-                    <Recharts.XAxis
-                      dataKey="ชื่อคลัง"
-                      angle={-45}
-                      textAnchor="end"
-                      interval={0}
-                      height={100}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <Recharts.YAxis
-                      yAxisId="left"
-                      label={{ value: 'มูลค่า (บาท)', angle: -90, position: 'insideLeft', offset: -10 }}
-                      tickFormatter={formatNumber}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <Recharts.YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      label={{ value: 'Stock Day (วัน)', angle: 90, position: 'insideRight', offset: -10 }}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <Recharts.Tooltip
-                      formatter={(value, name) => {
-                        if (name === 'Stock Day' || name === 'เป้าหมาย 180 วัน') return [Math.round(value), 'วัน'];
-                        return [formatNumber(value), 'บาท'];
-                      }}
-                    />
-                    <Recharts.Legend verticalAlign="top" height={36} />
-                    <Recharts.Bar
-                      yAxisId="left"
-                      dataKey="มูลค่าคลัง"
-                      name="มูลค่าคลัง"
-                      stackId="a"
-                      fill="#15803D"
-                      barSize={20}
-                    />
-                    <Recharts.Bar
-                      yAxisId="left"
-                      dataKey="มูลค่าวิศวกรรม"
-                      name="มูลค่าวิศวกรรม"
-                      stackId="a"
-                      fill="#6B21A8"
-                      barSize={20}
-                    >
-                      <Recharts.LabelList
-                        dataKey="ปลายงวดมูลค่ารวม"
-                        position="top"
-                        formatter={formatNumber}
-                        style={{ fontSize: 12, fill: 'black', fontWeight: 'bold' }}
-                      />
-                    </Recharts.Bar>
-                    <Recharts.Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="Stock Day"
-                      name="Stock Day"
-                      stroke="#10B981"
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                    >
-                      <Recharts.LabelList
-                        dataKey="Stock Day"
-                        position="top"
-                        formatter={(value) => `${Math.round(value)} วัน`}
-                        style={{ fontSize: 12, fill: '#fa2a1b', fontWeight: 'bold' }}
-                      />
-                    </Recharts.Line>
-                    <Recharts.ReferenceLine
-                      yAxisId="right"
-                      y={180}
-                      label={{ value: 'เป้าหมาย 180 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
-                      stroke="#DC2626"
-                      strokeDasharray="5 5"
-                      strokeWidth={2}
-                      ifOverflow="extendDomain"
-                    />
-                  </Recharts.ComposedChart>
-                </Recharts.ResponsiveContainer>
-              </div>
             </div>
             <div class="mb-12">
               <h2 class="text-2xl font-semibold text-blue-800 mb-4 tracking-wide leading-relaxed shadow-md">รายงานมูลค่า SPAREPART ศูนย์ SA</h2>
@@ -1193,90 +1173,8 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                   <p class="text-2xl font-bold text-purple-600">{saAvgStockday} วัน</p>
                 </div>
               </div>
-              <div class="w-full h-[500px]">
-                <Recharts.ResponsiveContainer width="100%" height="100%">
-                  <Recharts.ComposedChart data={saData} margin={{ top: 20, right: 30, left: 20, bottom: 100 }}>
-                    <Recharts.CartesianGrid strokeDasharray="3 3" />
-                    <Recharts.XAxis
-                      dataKey="ชื่อคลัง"
-                      angle={-45}
-                      textAnchor="end"
-                      interval={0}
-                      height={100}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <Recharts.YAxis
-                      yAxisId="left"
-                      label={{ value: 'มูลค่า (บาท)', angle: -90, position: 'insideLeft', offset: -10 }}
-                      tickFormatter={formatNumber}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <Recharts.YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      label={{ value: 'Stock Day (วัน)', angle: 90, position: 'insideRight', offset: -10 }}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <Recharts.Tooltip
-                      formatter={(value, name) => {
-                        if (name === 'Stock Day' || name === 'เป้าหมาย 180 วัน') return [Math.round(value), 'วัน'];
-                        return [formatNumber(value), 'บาท'];
-                      }}
-                    />
-                    <Recharts.Legend verticalAlign="top" height={36} />
-                    <Recharts.Bar
-                      yAxisId="left"
-                      dataKey="มูลค่าคลัง"
-                      name="มูลค่าคลัง"
-                      stackId="a"
-                      fill="#15803D"
-                      barSize={20}
-                    />
-                    <Recharts.Bar
-                      yAxisId="left"
-                      dataKey="มูลค่าวิศวกรรม"
-                      name="มูลค่าวิศวกรรม"
-                      stackId="a"
-                      fill="#6B21A8"
-                      barSize={20}
-                    >
-                      <Recharts.LabelList
-                        dataKey="ปลายงวดมูลค่ารวม"
-                        position="top"
-                        formatter={formatNumber}
-                        style={{ fontSize: 12, fill: 'black', fontWeight: 'bold' }}
-                      />
-                    </Recharts.Bar>
-                    <Recharts.Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="Stock Day"
-                      name="Stock Day"
-                      stroke="#10B981"
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                    >
-                      <Recharts.LabelList
-                        dataKey="Stock Day"
-                        position="top"
-                        formatter={(value) => `${Math.round(value)} วัน`}
-                        style={{ fontSize: 12, fill: '#fa2a1b', fontWeight: 'bold' }}
-                      />
-                    </Recharts.Line>
-                    <Recharts.ReferenceLine
-                      yAxisId="right"
-                      y={180}
-                      label={{ value: 'เป้าหมาย 180 วัน', position: 'insideTop', fill: '#DC2626', fontSize: 12 }}
-                      stroke="#DC2626"
-                      strokeDasharray="5 5"
-                      strokeWidth={2}
-                      ifOverflow="extendDomain"
-                    />
-                  </Recharts.ComposedChart>
-                </Recharts.ResponsiveContainer>
-              </div>
             </div>
-          
+            <SevenElevenChart selectedMonthYear={selectedMonthYear} />
             <div class="mb-12">
               <h2 class="text-2xl font-semibold text-blue-800 mb-4">
                 รายงานข้อมูล Sparepart ศูนย์ Company ({selectedMonthYear || 'ทุกเดือน'})
