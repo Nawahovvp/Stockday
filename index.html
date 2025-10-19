@@ -526,7 +526,7 @@
     };
     const SummaryHistoryPopup = ({ isOpen, onClose, data }) => {
       if (!isOpen) return null;
-   
+ 
       const getDaysInLastMonth = (monthYear) => {
   if (!monthYear) return 30;
   let [month, year] = monthYear.split('/').map(Number);
@@ -679,8 +679,8 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                   <Recharts.Legend verticalAlign="top" height={36} />
                   <Recharts.Bar
                     yAxisId="left"
-                    dataKey="มูลค่าคลังรวม"
-                    name="มูลค่าคลังรวม"
+                    dataKey="มูล่าคลังรวม"
+                    name="มูล่าคลังรวม"
                     stackId="a"
                     fill="#15803D"
                     barSize={20}
@@ -741,17 +741,22 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
           setLoading(false);
           return;
         }
-        const url = 'https://opensheet.elk.sh/1r418cqPa92z1_tO62z369pvQrzD3MVlaAfISMXSGFMc/StockDayindex';
+        const url = 'https://opensheet.elk.sh/1r418cqPa92z1_tO62z369pvQrzD3MVlaAfISMXSGFMc/Web';
         axios.get(url).then(response => {
           const rows = response.data;
-          const filtered = rows.filter(row => row.Mountyear === selectedMonthYear && row['Store Value'] !== 'On Process');
-          const processed = filtered.map(row => ({
-            ...row,
-            Status: row.Plant.startsWith('SA-') ? 'SA' : 'COMPANY',
-            Store: parseFloat(row.Store?.toString().replace(/,/g, '')) || 0,
-            StoreValue: parseFloat(row['Store Value']?.toString().replace(/,/g, '')) || 0,
-            CostStore: parseFloat(row.CostStore?.toString().replace(/,/g, '')) || 0,
-          })).sort((a, b) => {
+          const filtered = rows.filter(row => row.Mountyear === selectedMonthYear && row['Stock Day'] !== 'On Process');
+          const processed = filtered.map(row => {
+            const storeNum = parseFloat(row.Store?.toString().replace(/,/g, '')) || 1;
+            const totalValue = parseFloat(row['ปลายงวดมูลค่ารวม']?.toString().replace(/,/g, '')) || 0;
+            const totalCost = parseFloat(row['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0;
+            return {
+              ...row,
+              Status: row['ชื่อคลัง'].startsWith('SA-') ? 'SA' : 'COMPANY',
+              Store: storeNum,
+              StoreValue: totalValue / storeNum,
+              CostStore: totalCost / storeNum,
+            };
+          }).sort((a, b) => {
             if (a.Status !== b.Status) return a.Status.localeCompare(b.Status);
             return b.StoreValue - a.StoreValue;
           });
@@ -771,7 +776,7 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
             <Recharts.ResponsiveContainer width="100%" height="100%">
               <Recharts.ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 100 }}>
                 <Recharts.CartesianGrid strokeDasharray="3 3" />
-                <Recharts.XAxis dataKey="Plant" angle={-45} textAnchor="end" interval={0} height={100} tick={{ fontSize: 12 }} />
+                <Recharts.XAxis dataKey="ชื่อคลัง" angle={-45} textAnchor="end" interval={0} height={100} tick={{ fontSize: 12 }} />
                 <Recharts.YAxis yAxisId="left" label={{ value: 'จำนวนสาขา', angle: -90, position: 'insideLeft', offset: -10 }} tickFormatter={formatNumber} tick={{ fontSize: 12 }} />
                 <Recharts.YAxis yAxisId="right" orientation="right" label={{ value: 'มูลค่า (บาท)', angle: 90, position: 'insideRight', offset: -10 }} tickFormatter={formatNumber} tick={{ fontSize: 12 }} />
                 <Recharts.Tooltip
@@ -822,8 +827,12 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
               const stockEnd = parseFloat(row['ปลายงวดคลัง']?.toString().replace(/,/g, '')) || 0;
               const engBegin = parseFloat(row['ต้นงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
               const engEnd = parseFloat(row['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0;
+              const storeValue = parseFloat(row['Store']?.toString().replace(/,/g, '')) || 0;
+              const nonStoreValue = parseFloat(row['NonStore']?.toString().replace(/,/g, '')) || 0;
               return {
                 ...row,
+                'Store': storeValue,
+                'NonStore': nonStoreValue,
                 'ต้นงวดคลัง': stockBegin,
                 'ต้นงวดวิศวกรรม': engBegin,
                 'ต้นงวดมูลค่ารวม': beginValue,
@@ -966,6 +975,10 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
       const saSumEndEng = saData.reduce((sum, item) => sum + (parseFloat(item['ปลายงวดวิศวกรรม']?.toString().replace(/,/g, '')) || 0), 0);
       const saSumCost = saData.reduce((sum, item) => sum + (parseFloat(item['ต้นทุนขาย']?.toString().replace(/,/g, '')) || 0), 0);
       const saSumStockDay = saSumCost > 0 ? Math.round((((saSumEndValue + saSumBeginValue)/2) / saSumCost) * getDaysInLastMonth(selectedMonthYear)) : 0;
+      const companySumStore = companyData.reduce((sum, item) => sum + (parseFloat(item['Store']?.toString().replace(/,/g, '')) || 0), 0);
+      const companySumNonStore = companyData.reduce((sum, item) => sum + (parseFloat(item['NonStore']?.toString().replace(/,/g, '')) || 0), 0);
+      const saSumStore = saData.reduce((sum, item) => sum + (parseFloat(item['Store']?.toString().replace(/,/g, '')) || 0), 0);
+      const saSumNonStore = saData.reduce((sum, item) => sum + (parseFloat(item['NonStore']?.toString().replace(/,/g, '')) || 0), 0);
       return (
         <ErrorBoundary>
           <div class="bg-white rounded-lg shadow-lg p-6">
@@ -1184,6 +1197,8 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                   <thead>
                     <tr class="bg-blue-900">
                      <th rowspan="2" class="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500 text-blue-900">ศูนย์</th>
+                     <th rowspan="2" class="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">7-11</th>
+                     <th rowspan="2" class="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">Non 7-11</th>
                       <th colspan="3" class="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">ต้นงวด</th>
                       <th colspan="3" class="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">ปลายงวด</th>
                       <th rowspan="2" class="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">ต้นทุนขาย</th>
@@ -1209,20 +1224,22 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
   >
     {item['ชื่อคลัง']}
   </td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดคลัง'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดวิศวกรรม'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดมูลค่ารวม'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดคลัง'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดวิศวกรรม'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดมูลค่ารวม'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นทุนขาย'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : 'bg-green-100'}`}>
+                          <td class="border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm">{item['Store']}</td>
+                          <td class="border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm">{item['NonStore']}</td>
+                          <td class={`border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดคลัง'])}</td>
+                          <td class={`border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดวิศวกรรม'])}</td>
+                          <td class={`border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดมูลค่ารวม'])}</td>
+                          <td class={`border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดคลัง'])}</td>
+                          <td class={`border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดวิศวกรรม'])}</td>
+                          <td class={`border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดมูลค่ารวม'])}</td>
+                          <td class={`border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นทุนขาย'])}</td>
+                          <td class={`border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm ${Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : 'bg-green-100'}`}>
                             {Math.round(item['Stock Day'] || 0) === 0 ? 'On Process' : Math.round(item['Stock Day'] || 0)}
                           </td>
-                          <td class={`border border-gray-300 p-4 text-center ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>
+                          <td class={`border border-gray-300 p-2 text-center ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>
                             <button
                               onClick={() => handleHistoryClick(item['ชื่อคลัง'])}
-                              class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-base font-medium transition-colors duration-200"
+                              class="bg-blue-600 text-white px-2 py-1 rounded-md hover:bg-blue-700 text-sm font-medium transition-colors duration-200"
                             >
                               ผลดำเนินการ
                             </button>
@@ -1231,23 +1248,25 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                       ))
                     ) : (
                       <tr>
-                        <td colspan="10" class="border border-gray-300 p-4 text-center text-gray-600 font-medium text-base">
+                        <td colspan="12" class="border border-gray-300 p-4 text-center text-gray-600 font-medium text-base">
                           ไม่มีข้อมูล Company สำหรับ {selectedMonthYear || 'ทุกเดือน'}
                         </td>
                       </tr>
                     )}
                     {companyData.length > 0 && (
                       <tr class="bg-blue-100 font-bold transition-colors duration-200">
-                        <td class="border border-gray-300 p-4 text-center text-blue-900 text-base bg-blue-100">ผลรวม</td>
-                        <td class="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(companySumBeginStock)}</td>
-                        <td class="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(companySumBeginEng)}</td>
-                        <td class="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(companySumBeginValue)}</td>
-                        <td class="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(companySumEndStock)}</td>
-                        <td class="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(companySumEndEng)}</td>
-                        <td class="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(companySumEndValue)}</td>
-                        <td class="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(companySumCost)}</td>
-                        <td class="border border-gray-300 p-4 text-right text-blue-900 text-base">{Math.round(companySumStockDay)}</td>
-                        <td class="border border-gray-300 p-4 text-center text-blue-900 text-base">-</td>
+                        <td class="border border-gray-300 p-2 text-center text-blue-900 text-base bg-blue-100">ผลรวม</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{companySumStore}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{companySumNonStore}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{formatNumber(companySumBeginStock)}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{formatNumber(companySumBeginEng)}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{formatNumber(companySumBeginValue)}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{formatNumber(companySumEndStock)}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{formatNumber(companySumEndEng)}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{formatNumber(companySumEndValue)}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{formatNumber(companySumCost)}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{Math.round(companySumStockDay)}</td>
+                        <td class="border border-gray-300 p-2 text-center text-blue-900 text-base">-</td>
                       </tr>
                     )}
                   </tbody>
@@ -1263,6 +1282,8 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                   <thead>
                     <tr class="bg-blue-900">
                       <th rowspan="2" class="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500 text-blue-900">ศูนย์</th>
+                      <th rowspan="2" class="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">7-11</th>
+                      <th rowspan="2" class="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">Non 7-11</th>
                       <th colspan="3" class="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">ต้นงวด</th>
                       <th colspan="3" class="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">ปลายงวด</th>
                       <th rowspan="2" class="p-2 text-center font-bold text-white text-base border border-gray-300 border-b-2 border-blue-500">ต้นทุนขาย</th>
@@ -1288,20 +1309,22 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                               >
                             {item['ชื่อคลัง']}
                         </td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดคลัง'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดวิศวกรรม'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดมูลค่ารวม'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดคลัง'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดวิศวกรรม'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดมูลค่ารวม'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นทุนขาย'])}</td>
-                          <td class={`border border-gray-300 p-4 text-right text-gray-900 font-medium text-base ${Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : 'bg-green-100'}`}>
+                          <td class="border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm">{item['Store']}</td>
+                          <td class="border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm">{item['NonStore']}</td>
+                          <td class={`border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดคลัง'])}</td>
+                          <td class={`border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดวิศวกรรม'])}</td>
+                          <td class={`border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นงวดมูลค่ารวม'])}</td>
+                          <td class={`border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดคลัง'])}</td>
+                          <td class={`border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดวิศวกรรม'])}</td>
+                          <td class={`border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ปลายงวดมูลค่ารวม'])}</td>
+                          <td class={`border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>{formatNumber(item['ต้นทุนขาย'])}</td>
+                          <td class={`border border-gray-300 p-2 text-right text-gray-900 font-medium text-sm ${Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : 'bg-green-100'}`}>
                             {Math.round(item['Stock Day'] || 0) === 0 ? 'On Process' : Math.round(item['Stock Day'] || 0)}
                           </td>
-                          <td class={`border border-gray-300 p-4 text-center ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>
+                          <td class={`border border-gray-300 p-2 text-center ${Math.round(item['Stock Day'] || 0) > 180 ? 'bg-red-100' : Math.round(item['Stock Day'] || 0) === 0 ? 'bg-gray-200' : 'bg-green-100'}`}>
                             <button
                               onClick={() => handleHistoryClick(item['ชื่อคลัง'])}
-                              class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-base font-medium transition-colors duration-200"
+                              class="bg-blue-600 text-white px-2 py-1 rounded-md hover:bg-blue-700 text-sm font-medium transition-colors duration-200"
                             >
                               ผลดำเนินการ
                             </button>
@@ -1310,23 +1333,25 @@ const summaryData = [...new Set(data.map(item => item['Mountyear']))]
                       ))
                     ) : (
                       <tr>
-                        <td colspan="10" class="border border-gray-300 p-4 text-center text-gray-600 font-medium text-base">
+                        <td colspan="12" class="border border-gray-300 p-4 text-center text-gray-600 font-medium text-base">
                           ไม่มีข้อมูล SA สำหรับ {selectedMonthYear || 'ทุกเดือน'}
                         </td>
                       </tr>
                     )}
                     {saData.length > 0 && (
                       <tr class="bg-blue-100 font-bold transition-colors duration-200">
-                        <td class="border border-gray-300 p-4 text-center text-blue-900 text-base bg-blue-100">ผลรวม</td>
-                        <td class="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(saSumBeginStock)}</td>
-                        <td class="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(saSumBeginEng)}</td>
-                        <td class="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(saSumBeginValue)}</td>
-                        <td class="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(saSumEndStock)}</td>
-                        <td class="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(saSumEndEng)}</td>
-                        <td class="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(saSumEndValue)}</td>
-                        <td class="border border-gray-300 p-4 text-right text-blue-900 text-base">{formatNumber(saSumCost)}</td>
-                        <td class="border border-gray-300 p-4 text-right text-blue-900 text-base">{Math.round(saSumStockDay)}</td>
-                        <td class="border border-gray-300 p-4 text-center text-blue-900 text-base">-</td>
+                        <td class="border border-gray-300 p-2 text-center text-blue-900 text-base bg-blue-100">ผลรวม</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{saSumStore}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{saSumNonStore}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{formatNumber(saSumBeginStock)}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{formatNumber(saSumBeginEng)}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{formatNumber(saSumBeginValue)}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{formatNumber(saSumEndStock)}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{formatNumber(saSumEndEng)}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{formatNumber(saSumEndValue)}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{formatNumber(saSumCost)}</td>
+                        <td class="border border-gray-300 p-2 text-right text-blue-900 text-base">{Math.round(saSumStockDay)}</td>
+                        <td class="border border-gray-300 p-2 text-center text-blue-900 text-base">-</td>
                       </tr>
                     )}
                   </tbody>
